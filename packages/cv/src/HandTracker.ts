@@ -228,8 +228,14 @@ function toHandFrame(result: HandLandmarkerResult, timestamp: number): HandFrame
 
   const hands: TrackedHand[] = landmarksArr.map((landmarks, idx) => {
     const h = handednesses[idx]?.[0];
+    // MediaPipe's handedness classifier assumes a mirrored/selfie input. We feed it the
+    // raw webcam stream (the shell mirrors only the *displayed* video), so the labels
+    // come back from MediaPipe's reference frame and read as the user's opposite hand.
+    // Swap here so downstream games can treat "Right" as the user's actual right hand as
+    // they see it on screen.
+    const raw = h?.categoryName;
     const handedness: TrackedHand["handedness"] =
-      h?.categoryName === "Left" || h?.categoryName === "Right" ? h.categoryName : "Right";
+      raw === "Left" ? "Right" : raw === "Right" ? "Left" : "Right";
     const score = h?.score ?? 0;
     return {
       handedness,

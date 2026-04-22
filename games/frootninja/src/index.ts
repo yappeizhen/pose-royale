@@ -1,8 +1,13 @@
 /**
- * Frootninja `GameModule` entry point. The orchestrator calls `mount(el, ctx)`, we set up a
- * single <canvas>, subscribe to hand frames, and drive a RAF loop off deltaTime. Score is
- * emitted every frame so the HUD/dev-overlay sees live totals; in 2P matches we mirror the
- * local score to ctx.net and subscribe for the opponent's updates.
+ * Frootninja GameModule entry point. Vendored from yappeizhen/frootninja:
+ *   - 3D fruit & slice effects → FruitGame (Three.js)
+ *   - Slice detection from index-finger motion → GestureController
+ *   - Neon dual-colored laser trail → renderTrail() on a 2D overlay canvas
+ *
+ * Local raw score = successful slices minus bombs hit (1 point each). par = 40, so
+ * landing ~40 net slices in a 30 s round caps to 1000 tournament points. In 2P matches
+ * we mirror raw score via ctx.net and broadcast each slice so the opponent's view
+ * plays the same splash on the matching fruit.
  */
 
 import type {
@@ -11,204 +16,306 @@ import type {
   GameInstance,
   GameModule,
   HandFrame,
-  Landmark,
   Unsub,
 } from "@pose-royale/sdk";
-import { FruitGame, type FieldObject } from "./FruitGame.js";
+import { FruitGame, type GestureEvent } from "./FruitGame.js";
+import { GestureController } from "./GestureController.js";
 import { manifest } from "./manifest.js";
 
-const INDEX_FINGER_TIP = 8;
+interface TrailEntry {
+  id: string;
+  createdAt: number;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  glowColor: string;
+  width: number;
+}
+
+const TRAIL_LIFESPAN_MS = 300;
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function mount(el: HTMLElement, ctx: GameContext): GameInstance {
-  const canvas = document.createElement("canvas");
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
-  canvas.style.display = "block";
-  canvas.style.touchAction = "none";
-  canvas.style.background = "transparent";
-  el.appendChild(canvas);
+  // ── DOM scaffolding ───────────────────────────────────────────────────────
+  // GameStage mounts us into a `position:absolute; inset:0` host. Don't clobber
+  // that — if we force it to `relative`, it drops out of the fixed parent's
+  // containing block and collapses to height:0 (since all our children are
+  // absolute), and FruitGame.handleResize then no-ops on clientHeight===0.
+  if (!el.style.position) el.style.position = "relative";
+  el.style.overflow = "hidden";
 
-  const maybeCtx = canvas.getContext("2d");
-  if (!maybeCtx) throw new Error("frootninja: 2D canvas context unavailable");
-  const ctx2d: CanvasRenderingContext2D = maybeCtx;
+  // Three.js fruit canvas (fills host). NOT mirrored — the webcam background is
+  // the only mirrored layer. Gesture origin.x is already flipped below (1 - raw.x)
+  // so the fingertip's screen coord matches where the player sees their hand.
+  const fruitCanvas = document.createElement("canvas");
+  fruitCanvas.style.position = "absolute";
+  fruitCanvas.style.inset = "0";
+  fruitCanvas.style.width = "100%";
+  fruitCanvas.style.height = "100%";
+  fruitCanvas.style.display = "block";
+  el.appendChild(fruitCanvas);
 
-  const game = new FruitGame({ rng: ctx.rng });
+  // 2D overlay canvas for the neon laser trail.
+  const trailCanvas = document.createElement("canvas");
+  trailCanvas.style.position = "absolute";
+  trailCanvas.style.inset = "0";
+  trailCanvas.style.width = "100%";
+  trailCanvas.style.height = "100%";
+  trailCanvas.style.pointerEvents = "none";
+  el.appendChild(trailCanvas);
+  const trailCtx = trailCanvas.getContext("2d");
+  if (!trailCtx) throw new Error("frootninja: 2D canvas context unavailable for trail");
 
+  // HUD — score / bombs / opponent score.
+  const hud = document.createElement("div");
+  hud.style.cssText = [
+    "position:absolute",
+    "top:72px", // below the orchestrator header
+    "left:16px",
+    "right:16px",
+    "display:flex",
+    "justify-content:space-between",
+    "align-items:flex-start",
+    "gap:12px",
+    "pointer-events:none",
+    "font-family:var(--font-display, system-ui, sans-serif)",
+    "color:white",
+    "text-shadow:0 2px 8px rgba(0,0,0,0.6)",
+    "z-index:3",
+  ].join(";");
+  el.appendChild(hud);
+
+  const scoreBadge = document.createElement("div");
+  scoreBadge.style.cssText = [
+    "padding:8px 16px",
+    "border-radius:14px",
+    "background:rgba(0,0,0,0.45)",
+    "backdrop-filter:blur(6px)",
+    "font-size:1.5rem",
+    "font-weight:700",
+    "display:flex",
+    "gap:14px",
+    "align-items:center",
+  ].join(";");
+  hud.appendChild(scoreBadge);
+
+  const oppBadge = document.createElement("div");
+  oppBadge.style.cssText = scoreBadge.style.cssText;
+  oppBadge.style.opacity = "0.85";
+  hud.appendChild(oppBadge);
+
+  // Bomb hit flash overlay.
+  const bombFlash = document.createElement("div");
+  bombFlash.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "pointer-events:none",
+    "background:radial-gradient(circle at center, rgba(255,68,0,0.55) 0%, rgba(255,0,0,0.35) 50%, transparent 100%)",
+    "opacity:0",
+    "transition:opacity 160ms ease-out",
+    "z-index:5",
+  ].join(";");
+  el.appendChild(bombFlash);
+
+  // ── Game engine + gesture detector ────────────────────────────────────────
+  const game = new FruitGame(fruitCanvas, ctx.rng);
+  const gestures = new GestureController();
+
+  // ── Multiplayer plumbing ──────────────────────────────────────────────────
   const remoteId = ctx.players.find((p) => !p.isLocal)?.id;
   let remoteRaw = 0;
   const netSubs: Unsub[] = [];
+
   if (ctx.net && remoteId) {
     netSubs.push(
       ctx.net.subscribe<number>(`score_${remoteId}`, (value) => {
-        if (typeof value === "number" && Number.isFinite(value)) remoteRaw = value;
+        if (typeof value === "number" && Number.isFinite(value)) {
+          remoteRaw = value;
+          // Emit only when the opponent's score actually changes. Avoids a 60 Hz
+          // stream of redundant score events into the SDK's emit pipeline.
+          ctx.emitScore({ playerId: remoteId, raw: remoteRaw });
+        }
       }),
+    );
+    // When the opponent slices a fruit, we replay the effect on our deterministic copy.
+    netSubs.push(
+      ctx.net.subscribe<{ fruitId: string; x: number; y: number; at: number }>(
+        `slice_${remoteId}`,
+        (slice) => {
+          if (!slice) return;
+          game.triggerSliceEffectById(slice.fruitId, slice.x, slice.y);
+        },
+      ),
     );
   }
 
-  // Track fingertips by hand index for smooth motion (mirrors the webcam view so player
-  // sees their own hand = blade).
-  type Tip = { x: number; y: number };
-  let leftTip: Tip | null = null;
-  let rightTip: Tip | null = null;
-  let lastTickMs = 0;
-  let running = true;
-  let paused = false;
-  let rafId = 0;
+  // ── Score state ───────────────────────────────────────────────────────────
+  let slices = 0;
+  let bombs = 0;
   let lastScoreBroadcast = -1;
+  const raw = () => Math.max(0, slices - bombs);
 
-  const handSub = ctx.hands.subscribe((frame) => {
-    updateTipsFromFrame(frame);
+  // ── Gesture → slice pipeline ──────────────────────────────────────────────
+  const trails: TrailEntry[] = [];
+  let lastTrailId: string | undefined;
+
+  const handSub = ctx.hands.subscribe((frame: HandFrame) => {
+    const events = gestures.processFrame(frame);
+    for (const raw of events) {
+      // MediaPipe returns landmarks in raw (un-mirrored) camera space. The webcam
+      // background is displayed mirrored so the user sees themselves naturally, so
+      // we flip x once here to convert into on-screen (display) coordinates that
+      // the game canvas also uses.
+      const event: GestureEvent = {
+        ...raw,
+        origin: { ...raw.origin, x: 1 - raw.origin.x },
+        direction: { x: -raw.direction.x, y: raw.direction.y },
+      };
+
+      // Push neon trail.
+      pushTrail(event);
+
+      // Ask the engine to attempt a hit.
+      const result = game.handleGesture(event);
+      if (!result) continue;
+      if (result.isBomb) {
+        bombs += 1;
+        flashBomb();
+      } else {
+        slices += 1;
+      }
+      if (ctx.net) {
+        void ctx.net.set(`slice_${ctx.localPlayerId}`, {
+          fruitId: result.fruitId,
+          x: event.origin.x,
+          y: event.origin.y,
+          at: Date.now(),
+        });
+      }
+    }
   });
 
-  function updateTipsFromFrame(frame: HandFrame): void {
-    const map: { Left: Tip | null; Right: Tip | null } = { Left: null, Right: null };
-    for (const h of frame.hands) {
-      const lm: Landmark | undefined = h.landmarks[INDEX_FINGER_TIP];
-      if (!lm) continue;
-      // We render mirrored so the player sees themselves — flip x into field space too.
-      map[h.handedness] = { x: 1 - lm.x, y: lm.y };
-    }
-    leftTip = map.Left;
-    rightTip = map.Right;
+  function pushTrail(event: GestureEvent) {
+    if (event.id === lastTrailId) return;
+    lastTrailId = event.id;
+    const glowColor = event.hand === "Left" ? "#00ffff" : "#bf00ff";
+    const length = 0.25 + event.strength * 0.4;
+    trails.push({
+      id: event.id,
+      createdAt: performance.now(),
+      start: { x: clamp01(event.origin.x), y: clamp01(event.origin.y) },
+      end: {
+        x: clamp01(event.origin.x + event.direction.x * length),
+        y: clamp01(event.origin.y + event.direction.y * length),
+      },
+      glowColor,
+      width: 12 + event.strength * 8,
+    });
   }
 
-  function resize(): void {
+  function flashBomb() {
+    bombFlash.style.opacity = "1";
+    window.setTimeout(() => {
+      bombFlash.style.opacity = "0";
+    }, 160);
+  }
+
+  // ── Resize wiring ─────────────────────────────────────────────────────────
+  function resize() {
     const rect = el.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    trailCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    trailCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    game.syncViewport();
   }
   const ro = new ResizeObserver(resize);
   ro.observe(el);
   resize();
 
-  const renderFrame = (nowMs: number): void => {
+  // ── Render loop for the trail overlay + HUD + score broadcasting ──────────
+  let running = true;
+  let paused = false;
+  let rafId = 0;
+
+  function renderFrame() {
     if (!running) return;
     rafId = requestAnimationFrame(renderFrame);
-    if (paused) {
-      lastTickMs = nowMs;
-      return;
+    if (paused) return;
+    drawTrails();
+    drawHud();
+
+    const r = raw();
+    if (r !== lastScoreBroadcast) {
+      ctx.emitScore({ playerId: ctx.localPlayerId, raw: r });
+      if (ctx.net) void ctx.net.set(`score_${ctx.localPlayerId}`, r);
+      lastScoreBroadcast = r;
     }
-    const dt = lastTickMs === 0 ? 0 : Math.min(0.05, (nowMs - lastTickMs) / 1000);
-    lastTickMs = nowMs;
+  }
 
-    // Feed blade samples (index fingertip) before stepping physics so slices register with
-    // the current positions rather than lagging a frame.
-    if (leftTip) pushBlade(leftTip);
-    if (rightTip) pushBlade(rightTip);
-
-    game.tick(dt);
-    draw();
-
-    const raw = game.rawScore();
-    if (raw !== lastScoreBroadcast) {
-      ctx.emitScore({ playerId: ctx.localPlayerId, raw });
-      if (ctx.net) void ctx.net.set(`score_${ctx.localPlayerId}`, raw);
-      lastScoreBroadcast = raw;
+  function drawTrails() {
+    const canvas = trailCanvas;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    trailCtx!.clearRect(0, 0, canvas.width, canvas.height);
+    const now = performance.now();
+    for (let i = trails.length - 1; i >= 0; i--) {
+      const t = trails[i]!;
+      const age = now - t.createdAt;
+      const progress = age / TRAIL_LIFESPAN_MS;
+      if (progress >= 1) {
+        trails.splice(i, 1);
+        continue;
+      }
+      const alpha = 1 - Math.pow(progress, 0.5);
+      const lw = t.width * dpr * (1 - progress);
+      trailCtx!.save();
+      trailCtx!.globalAlpha = alpha;
+      trailCtx!.lineCap = "butt";
+      trailCtx!.lineJoin = "miter";
+      trailCtx!.shadowBlur = 25 * dpr;
+      trailCtx!.shadowColor = t.glowColor;
+      trailCtx!.strokeStyle = t.glowColor;
+      trailCtx!.lineWidth = lw;
+      trailCtx!.beginPath();
+      trailCtx!.moveTo(t.start.x * canvas.width, t.start.y * canvas.height);
+      trailCtx!.lineTo(t.end.x * canvas.width, t.end.y * canvas.height);
+      trailCtx!.stroke();
+      trailCtx!.shadowBlur = 5 * dpr;
+      trailCtx!.shadowColor = "#ffffff";
+      trailCtx!.lineWidth = lw * 0.3;
+      trailCtx!.strokeStyle = "#ffffff";
+      trailCtx!.stroke();
+      trailCtx!.restore();
     }
+  }
+
+  function drawHud() {
+    scoreBadge.textContent = `🍉 ${slices}  💣 ${bombs}`;
     if (remoteId) {
-      ctx.emitScore({ playerId: remoteId, raw: remoteRaw });
-    }
-  };
-
-  function pushBlade(tip: Tip): void {
-    game.pushBlade({ x: tip.x, y: tip.y });
-  }
-
-  function draw(): void {
-    const { width: W, height: H } = canvas;
-    ctx2d.clearRect(0, 0, W, H);
-
-    // Subtle vertical gradient so the canvas is visible over the webcam — alpha-heavy.
-    const grad = ctx2d.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, "rgba(15, 18, 35, 0.15)");
-    grad.addColorStop(1, "rgba(15, 18, 35, 0.45)");
-    ctx2d.fillStyle = grad;
-    ctx2d.fillRect(0, 0, W, H);
-
-    const state = game.state();
-    for (const obj of state.objects) {
-      drawObject(obj, W, H);
-    }
-    drawBlade(W, H);
-    drawHud(state.sliced, state.bombs, W);
-  }
-
-  function drawObject(obj: FieldObject, W: number, H: number): void {
-    const x = obj.x * W;
-    const y = obj.y * H;
-    const r = Math.max(16, Math.min(W, H) * 0.04);
-    ctx2d.save();
-    if (obj.kind === "fruit") {
-      ctx2d.fillStyle = obj.sliced ? "rgba(255, 180, 60, 0.35)" : "#ff6b9a";
-      ctx2d.beginPath();
-      ctx2d.arc(x, y, r, 0, Math.PI * 2);
-      ctx2d.fill();
-      ctx2d.strokeStyle = "#fff";
-      ctx2d.lineWidth = 2;
-      ctx2d.stroke();
+      oppBadge.textContent = `OPP ${remoteRaw}`;
+      oppBadge.style.display = "";
     } else {
-      ctx2d.fillStyle = obj.sliced ? "rgba(80, 80, 80, 0.35)" : "#18181b";
-      ctx2d.beginPath();
-      ctx2d.arc(x, y, r, 0, Math.PI * 2);
-      ctx2d.fill();
-      ctx2d.strokeStyle = "#ff4444";
-      ctx2d.lineWidth = 3;
-      ctx2d.stroke();
+      oppBadge.style.display = "none";
     }
-    ctx2d.restore();
-  }
-
-  function drawBlade(W: number, H: number): void {
-    const trail = game.bladeTrail();
-    if (trail.length < 2) return;
-    ctx2d.save();
-    ctx2d.strokeStyle = "rgba(255, 255, 255, 0.85)";
-    ctx2d.lineWidth = 4;
-    ctx2d.lineCap = "round";
-    ctx2d.beginPath();
-    ctx2d.moveTo(trail[0]!.x * W, trail[0]!.y * H);
-    for (let i = 1; i < trail.length; i++) {
-      const p = trail[i]!;
-      ctx2d.lineTo(p.x * W, p.y * H);
-    }
-    ctx2d.stroke();
-    ctx2d.restore();
-  }
-
-  function drawHud(sliced: number, bombs: number, W: number): void {
-    ctx2d.save();
-    ctx2d.fillStyle = "rgba(0,0,0,0.35)";
-    ctx2d.fillRect(16, 16, 200, 44);
-    ctx2d.fillStyle = "#fff";
-    ctx2d.font = "bold 20px system-ui, sans-serif";
-    ctx2d.fillText(`🍉 ${sliced}   💣 ${bombs}`, 28, 44);
-    if (remoteId) {
-      ctx2d.fillStyle = "rgba(0,0,0,0.35)";
-      ctx2d.fillRect(W - 216, 16, 200, 44);
-      ctx2d.fillStyle = "#fff";
-      ctx2d.fillText(`OPP ${remoteRaw}`, W - 200, 44);
-    }
-    ctx2d.restore();
   }
 
   const roundEndUnsub = ctx.onRoundEnd((final: FinalScore) => {
-    // The orchestrator handles aggregation/final screen — this is just a nice hook for
-    // future "celebrate my KO" animations. Intentionally no-op for now beyond acknowledging.
+    // Orchestrator owns aggregation & the final screen. This hook is where we'd trigger
+    // a celebration particle burst in a future polish pass.
     void final;
   });
 
   return {
     start() {
-      lastTickMs = 0;
+      game.start();
       rafId = requestAnimationFrame(renderFrame);
     },
     pause() {
       paused = true;
+      game.stop();
     },
     resume() {
       paused = false;
-      lastTickMs = 0;
+      game.start();
     },
     destroy() {
       running = false;
@@ -217,7 +324,9 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
       roundEndUnsub();
       for (const u of netSubs) u();
       ro.disconnect();
-      canvas.remove();
+      game.dispose();
+      gestures.reset();
+      while (el.firstChild) el.removeChild(el.firstChild);
     },
   };
 }

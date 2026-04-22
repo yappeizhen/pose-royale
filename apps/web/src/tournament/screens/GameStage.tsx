@@ -79,7 +79,8 @@ export function GameStage({
   }, [deadline, now, onDeadline]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000" }}>
+    // Transparent root — the webcam background in App.tsx stays visible behind the game.
+    <div style={{ position: "fixed", inset: 0, background: "transparent" }}>
       <header
         style={{
           position: "fixed",

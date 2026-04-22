@@ -15,9 +15,11 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@pose-royale/sdk": "workspace:*"
+    "@pose-royale/sdk": "workspace:*",
+    "three": "^0.181.2"
   },
   "devDependencies": {
+    "@types/three": "^0.181.0",
     "typescript": "~5.9.3",
     "vitest": "^4.0.14"
   }

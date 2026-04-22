@@ -110,6 +110,17 @@ export function TournamentRunner({
     registry.length === 0 ? { kind: "final" } : { kind: "reveal" },
   );
   const [results, setResults] = useState<readonly RoundResult[]>([]);
+  // Game id chosen for a sudden-death tiebreaker (set lazily when we detect a tie at the
+  // end of the gauntlet). Kept out of `plan.setlist` so the base setlist stays immutable.
+  const [suddenDeathGameId, setSuddenDeathGameId] = useState<string | null>(null);
+
+  // Resolve the game id for a given round index, falling back to the sudden-death pick for
+  // indices past the end of the base setlist.
+  const gameIdForRound = useCallback(
+    (roundIndex: number): string | null =>
+      plan.setlist[roundIndex] ?? (roundIndex === plan.setlist.length ? suddenDeathGameId : null),
+    [plan.setlist, suddenDeathGameId],
+  );
   const runtimeRef = useRef<GameRuntime | null>(null);
   const announcerRef = useRef<Announcer | null>(null);
   if (announcerRef.current === null) announcerRef.current = new Announcer();
@@ -122,7 +133,8 @@ export function TournamentRunner({
     if (phase.kind === "reveal" && manifests[0]) {
       a.setlistReveal(manifests[0].name);
     } else if (phase.kind === "countdown") {
-      const m = registry.find((r) => r.id === plan.setlist[phase.roundIndex])?.manifest;
+      const gameId = gameIdForRound(phase.roundIndex);
+      const m = gameId ? registry.find((r) => r.id === gameId)?.manifest : undefined;
       if (phase.suddenDeath) a.suddenDeath();
       else if (m) a.roundStart(m.name, phase.roundIndex, plan.setlist.length);
     } else if (phase.kind === "interlude") {
@@ -148,7 +160,7 @@ export function TournamentRunner({
           : null,
       );
     }
-  }, [phase, manifests, plan.setlist, registry, results, players]);
+  }, [phase, manifests, plan.setlist, registry, results, players, gameIdForRound]);
   useEffect(
     () => () => {
       announcerRef.current?.cancel();
@@ -171,15 +183,16 @@ export function TournamentRunner({
       });
 
       // Warm the module bundle during the countdown — it's free latency hiding.
-      void loadModule(plan.setlist[roundIndex] ?? "").catch(() => {});
+      const currentId = gameIdForRound(roundIndex);
+      if (currentId) void loadModule(currentId).catch(() => {});
 
       // Prefetch the next round's module in the background.
-      const nextId = plan.setlist[roundIndex + 1];
+      const nextId = gameIdForRound(roundIndex + 1);
       if (nextId) void loadModule(nextId).catch(() => {});
       // `startsAt` above is used to compute the playing deadline once the countdown elapses.
       return startsAt;
     },
-    [now, plan, loadModule],
+    [now, plan, loadModule, gameIdForRound],
   );
 
   // Transition: countdown → playing. We drive this from the Countdown onComplete callback.
@@ -211,18 +224,16 @@ export function TournamentRunner({
     const final: FinalScore = rt.finalize();
     setPhase((p) => {
       if (p.kind !== "playing") return p;
-      const gameId = plan.setlist[p.roundIndex] ?? "unknown";
+      const gameId = gameIdForRound(p.roundIndex) ?? "unknown";
       const result = buildRoundResult(gameId, final);
-      setResults((prev) => {
-        const next = [...prev, result];
-        return next;
-      });
+      setResults((prev) => [...prev, result]);
       return { kind: "interlude", justFinished: p.roundIndex };
     });
-  }, [plan.setlist]);
+  }, [gameIdForRound]);
 
   // Continue from interlude: either start next round or go to final (potentially with
-  // sudden death).
+  // sudden death). Sudden-death keeps the base setlist immutable — we stash the chosen
+  // game id in `suddenDeathGameId` state and `gameIdForRound(setlist.length)` resolves it.
   const continueFromInterlude = useCallback(() => {
     setPhase((p) => {
       if (p.kind !== "interlude") return p;
@@ -239,16 +250,13 @@ export function TournamentRunner({
       // Gauntlet complete — check for tie.
       const lead = leaderOf(results);
       if (lead.kind === "tie" && lead.tiedIds.length > 1 && setlist.length > 0) {
-        // Spin up a sudden death round — pick a random game from the setlist (plan §4).
         const rng = createRng(seed ^ 0xbadb17);
-        const suddenGameId = setlist[Math.floor(rng() * setlist.length)] ?? setlist[0] ?? "";
-        if (suddenGameId) {
-          // Append to the setlist so indexing stays consistent with the rest of the machine.
-          const newRoundIndex = plan.setlist.length;
-          (plan.setlist as string[])[newRoundIndex] = suddenGameId;
+        const pickedId = setlist[Math.floor(rng() * setlist.length)] ?? setlist[0] ?? "";
+        if (pickedId) {
+          setSuddenDeathGameId(pickedId);
           return {
             kind: "countdown",
-            roundIndex: newRoundIndex,
+            roundIndex: plan.setlist.length,
             startsAt: now(),
             durationMs: plan.countdownMs,
             suddenDeath: true,
@@ -258,12 +266,6 @@ export function TournamentRunner({
       return { kind: "final" };
     });
   }, [plan, now, results, setlist, seed, startRound]);
-
-  // Fire startRound once on initial transition out of reveal (runs exactly once).
-  useEffect(() => {
-    if (phase.kind === "reveal") return;
-    // no-op — startRound is triggered by the reveal onDone callback.
-  }, [phase.kind]);
 
   // Build a GameContext for the currently-playing round. Creates a fresh GameRuntime per
   // round so scoring state doesn't leak between games.
@@ -296,13 +298,18 @@ export function TournamentRunner({
   );
 
   // ── Dev overlay stats ──────────────────────────────────────────────────
+  const currentGameId =
+    phase.kind === "playing" || phase.kind === "countdown"
+      ? gameIdForRound(phase.roundIndex)
+      : null;
+  const currentManifest = currentGameId
+    ? (registry.find((r) => r.id === currentGameId)?.manifest ?? null)
+    : null;
+
   const devStats: DevOverlayStats = (() => {
     const base: DevOverlayStats = {
       phase: phase.kind,
-      gameId:
-        phase.kind === "playing" || phase.kind === "countdown"
-          ? (plan.setlist[phase.roundIndex] ?? null)
-          : null,
+      gameId: currentGameId,
       seed,
       handConfidence: hands.confidence,
     };
@@ -315,13 +322,6 @@ export function TournamentRunner({
 
   // ── Rendering ──────────────────────────────────────────────────────────
   const totals = cumulative(results);
-  const currentGameId =
-    phase.kind === "playing" || phase.kind === "countdown"
-      ? (plan.setlist[phase.roundIndex] ?? null)
-      : null;
-  const currentManifest = currentGameId
-    ? (registry.find((r) => r.id === currentGameId)?.manifest ?? null)
-    : null;
 
   return (
     <BackScope
@@ -358,7 +358,7 @@ export function TournamentRunner({
         <PlayingPhase
           registry={registry}
           roundIndex={phase.roundIndex}
-          setlist={plan.setlist}
+          gameId={currentGameId}
           deadline={phase.startsAt + phase.durationMs}
           now={now}
           players={players}
@@ -368,7 +368,7 @@ export function TournamentRunner({
             const rt = runtimeRef.current;
             const fallback: FinalScore = Object.fromEntries(players.map((p) => [p.id, 0]));
             if (rt) rt.finalize();
-            const gameId = plan.setlist[phase.roundIndex] ?? "unknown";
+            const gameId = currentGameId ?? "unknown";
             setResults((prev) => [...prev, buildRoundResult(gameId, fallback)]);
             setPhase({ kind: "interlude", justFinished: phase.roundIndex });
           }}
@@ -376,13 +376,14 @@ export function TournamentRunner({
       ) : phase.kind === "interlude" ? (
         <Interlude
           players={players}
-          justFinished={results[phase.justFinished] ?? emptyRound(phase.justFinished, plan.setlist)}
-          cumulative={totals}
-          nextManifest={
-            phase.justFinished + 1 < plan.setlist.length
-              ? (registry.find((r) => r.id === plan.setlist[phase.justFinished + 1])?.manifest ?? null)
-              : null
+          justFinished={
+            results[phase.justFinished] ?? emptyRound(gameIdForRound(phase.justFinished))
           }
+          cumulative={totals}
+          nextManifest={(() => {
+            const nextId = gameIdForRound(phase.justFinished + 1);
+            return nextId ? (registry.find((r) => r.id === nextId)?.manifest ?? null) : null;
+          })()}
           heading={
             phase.justFinished + 1 < plan.setlist.length
               ? `After round ${phase.justFinished + 1} of ${plan.setlist.length}`
@@ -426,8 +427,8 @@ export function TournamentRunner({
   );
 }
 
-function emptyRound(idx: number, setlist: readonly string[]): RoundResult {
-  return { gameId: setlist[idx] ?? "unknown", normalized: {}, points: {} };
+function emptyRound(gameId: string | null): RoundResult {
+  return { gameId: gameId ?? "unknown", normalized: {}, points: {} };
 }
 
 function EmptyRegistryNotice({ onExit }: { onExit: () => void }) {
@@ -462,7 +463,7 @@ function EmptyRegistryNotice({ onExit }: { onExit: () => void }) {
 interface PlayingPhaseProps {
   registry: readonly RegistryEntry[];
   roundIndex: number;
-  setlist: readonly string[];
+  gameId: string | null;
   deadline: number;
   now: () => number;
   players: readonly Player[];
@@ -478,7 +479,7 @@ interface PlayingPhaseProps {
 function PlayingPhase({
   registry,
   roundIndex,
-  setlist,
+  gameId,
   deadline,
   now,
   players,
@@ -486,8 +487,7 @@ function PlayingPhase({
   onDeadline,
   onCrash,
 }: PlayingPhaseProps) {
-  const gameId = setlist[roundIndex] ?? "";
-  const entry = registry.find((r) => r.id === gameId) ?? null;
+  const entry = gameId ? (registry.find((r) => r.id === gameId) ?? null) : null;
   const [module, setModule] = useState<GameModule | null>(null);
 
   useEffect(() => {

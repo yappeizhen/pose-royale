@@ -7,7 +7,13 @@
   place-items: center;
   padding: 1.5rem;
   color: white;
-  background: radial-gradient(circle at 50% 30%, #1a1a2e, #0a0a15);
+  /* Semi-transparent so the webcam background shows through during reveal / interlude /
+     final — keeps the player visible on stage between rounds. */
+  background: radial-gradient(
+    circle at 50% 30%,
+    rgba(26, 26, 46, 0.82),
+    rgba(10, 10, 21, 0.92)
+  );
   animation: tournament-fade-in 240ms ease-out;
 }
 
