@@ -1,0 +1,2 @@
+# Self-hosted MediaPipe WASM runtime gets copied here by scripts/copy-mediapipe-assets.mjs
+# at predev/prebuild time. The contents are gitignored; this file keeps the folder around.

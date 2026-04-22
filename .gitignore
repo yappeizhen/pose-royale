@@ -1,0 +1,38 @@
+# deps
+node_modules
+.pnpm-store
+
+# build output
+dist
+build
+.vite
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+
+# os
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# coverage
+coverage
+.nyc_output
+
+# self-hosted MediaPipe WASM (copied from node_modules at predev/prebuild time)
+apps/web/public/mediapipe/wasm

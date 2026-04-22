@@ -1,0 +1,29 @@
+:root {
+  color-scheme: dark;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --bg-0: #0a0a15;
+  --bg-1: #12121f;
+  --fg-0: #ffffff;
+  --fg-1: rgba(255, 255, 255, 0.72);
+  --accent: #ff2f6a;
+  --accent-2: #7dd3fc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--bg-0);
+  color: var(--fg-0);
+}
+
+button {
+  font-family: inherit;
+}
