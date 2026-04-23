@@ -1,5 +1,5 @@
 import type { GameContext, GameInstance, GameModule, Player } from "@pose-royale/sdk";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./screens.css";
 
 interface Props {
@@ -83,6 +83,7 @@ export function GameStage({
     <div className="stage-root">
       <header className="stage-header">
         <span className="title">{heading}</span>
+        <StageClock deadline={deadline} now={now} />
         <div className="chips">
           {players.map((p) => (
             <span
@@ -103,5 +104,41 @@ export function GameStage({
       </header>
       <div ref={hostRef} className="stage-host" />
     </div>
+  );
+}
+
+/**
+ * Ticking "seconds remaining" badge pinned to the top of the stage. Polls at 200ms
+ * because seconds-granular display doesn't need per-frame updates, and keeping it out
+ * of the RAF loop means the game gets all of the frame budget. Turns red + pulses in
+ * the final 5 seconds so the player gets a clear "hurry up" cue.
+ */
+function StageClock({ deadline, now }: { deadline: number; now: () => number }) {
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    Math.max(0, Math.ceil((deadline - now()) / 1000)),
+  );
+
+  useEffect(() => {
+    // Tick immediately so the badge is correct on mount rather than waiting 200ms.
+    const sync = () =>
+      setSecondsLeft(Math.max(0, Math.ceil((deadline - now()) / 1000)));
+    sync();
+    const id = window.setInterval(sync, 200);
+    return () => window.clearInterval(id);
+  }, [deadline, now]);
+
+  const isWarning = secondsLeft <= 5 && secondsLeft > 0;
+  const isOver = secondsLeft <= 0;
+
+  return (
+    <span
+      className={`stage-clock${isWarning ? " is-warning" : ""}${isOver ? " is-over" : ""}`}
+      aria-live="polite"
+      aria-label={`${secondsLeft} seconds remaining`}
+    >
+      <span aria-hidden>⏱</span>
+      <span className="stage-clock__num">{secondsLeft}</span>
+      <span className="stage-clock__unit">s</span>
+    </span>
   );
 }

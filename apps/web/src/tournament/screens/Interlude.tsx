@@ -1,4 +1,4 @@
-import type { GameManifest, Player } from "@pose-royale/sdk";
+import type { Player } from "@pose-royale/sdk";
 import type { Cumulative, RoundResult } from "../scoreLedger.js";
 import "./screens.css";
 
@@ -6,29 +6,23 @@ interface Props {
   players: readonly Player[];
   justFinished: RoundResult;
   cumulative: Cumulative;
-  nextManifest: GameManifest | null;
+  /** True if another round (or sudden death) follows — controls CTA copy. */
+  hasNextRound: boolean;
   /** Shown label e.g. "After Round 1 of 3". */
   heading: string;
   onContinue: () => void;
 }
 
-function gameAccent(id: string): string {
-  if (id === "frootninja") return "game-accent-frootninja";
-  if (id === "ponghub") return "game-accent-ponghub";
-  return "game-accent-default";
-}
-
-function gameEmoji(id: string): string {
-  if (id === "frootninja") return "🍉";
-  if (id === "ponghub") return "🏓";
-  return "🎮";
-}
-
+/**
+ * Post-round results screen. Deliberately does NOT show which game is next — that's
+ * the selector's job to reveal, so keeping it hidden here preserves the randomiser's
+ * drama instead of spoiling it with a "Next up: …" card.
+ */
 export function Interlude({
   players,
   justFinished,
   cumulative,
-  nextManifest,
+  hasNextRound,
   heading,
   onContinue,
 }: Props) {
@@ -51,23 +45,8 @@ export function Interlude({
           ))}
         </div>
 
-        {nextManifest ? (
-          <div
-            className={`tournament-demo-card ${gameAccent(nextManifest.id)}`}
-            style={{ maxWidth: 460 }}
-          >
-            <div className="card-header">
-              <span>
-                {gameEmoji(nextManifest.id)} Next up
-              </span>
-            </div>
-            <h3>{nextManifest.name}</h3>
-            <p className="how-to">{nextManifest.demo.howToPlay}</p>
-          </div>
-        ) : null}
-
         <button className="tournament-button primary lg" onClick={onContinue}>
-          {nextManifest ? "Ready!" : "Continue"}
+          {hasNextRound ? "Spin for next game" : "See final scores"}
         </button>
       </div>
     </div>

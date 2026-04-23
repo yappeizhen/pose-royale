@@ -224,10 +224,7 @@ function PhaseView({
   }
 
   if (phase.kind === "interlude") {
-    const nextId = machine.gameIdForRound(phase.justFinished + 1);
-    const nextManifest = nextId
-      ? (registry.find((r) => r.id === nextId)?.manifest ?? null)
-      : null;
+    const hasNextRound = phase.justFinished + 1 < plan.setlist.length;
     return (
       <Interlude
         players={players}
@@ -236,9 +233,9 @@ function PhaseView({
           emptyRound(machine.gameIdForRound(phase.justFinished))
         }
         cumulative={totals}
-        nextManifest={nextManifest}
+        hasNextRound={hasNextRound}
         heading={
-          phase.justFinished + 1 < plan.setlist.length
+          hasNextRound
             ? `After round ${phase.justFinished + 1} of ${plan.setlist.length}`
             : "Final round complete"
         }

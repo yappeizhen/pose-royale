@@ -38,14 +38,24 @@ function gameEmoji(id: string): string {
   return "🎮";
 }
 
-/** How long the reel dwells after landing before we fire `onDone`. */
-const LANDED_DWELL_MS = 650;
+/**
+ * Short anticipation pause after the screen renders and before the reel kicks off —
+ * gives the player a beat to read "NEXT UP…" and makes the spin feel like an event
+ * instead of a jarring cold-start.
+ */
+const PRE_SPIN_DELAY_MS = 750;
+/**
+ * How long the reel dwells on the winning game after the spin stops, before we fire
+ * `onDone` and move on to the briefing. Long enough for the player to read the "LOCKED
+ * IN!" banner and recognise the game that was picked.
+ */
+const LANDED_DWELL_MS = 1_900;
 /** Height of a single reel cell in pixels. Kept in sync with the CSS `--reel-cell-h`. */
 const REEL_CELL_H = 80;
 /** How many cells make up the reel. More = longer visible spin = more drama. */
 const REEL_LENGTH = 22;
 
-type SpinPhase = "start" | "spinning" | "landed";
+type SpinPhase = "idle" | "spinning" | "landed";
 
 export function GameSelector({ target, pool, label, durationMs, onDone }: Props) {
   // The reel is a deterministic sequence of games. We cycle through the pool (which
@@ -62,31 +72,33 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
     return items;
   }, [pool, target]);
 
-  const [phase, setPhase] = useState<SpinPhase>("start");
+  const [phase, setPhase] = useState<SpinPhase>("idle");
 
-  const spinMs = Math.max(400, durationMs - LANDED_DWELL_MS);
+  // Total layout: [PRE_SPIN_DELAY_MS idle] → [spinMs spinning] → [LANDED_DWELL_MS landed].
+  // Floor the spin at 800ms so tiny `durationMs` values don't cause a teleport — the
+  // bezier S-curve below needs room to breathe.
+  const spinMs = Math.max(800, durationMs - PRE_SPIN_DELAY_MS - LANDED_DWELL_MS);
 
   useEffect(() => {
-    // Two RAFs so the browser commits the initial `translateY` *before* flipping to the
-    // spinning class that activates the transition. Without this the first render already
-    // paints in-transition and we lose the spin.
-    let raf1 = 0;
-    let raf2 = 0;
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setPhase("spinning"));
-    });
-    const landTimer = window.setTimeout(
-      () => setPhase("landed"),
-      // Give the CSS transition a hair of extra time to finish before we swap to landed
-      // styling so the two don't visually collide.
-      spinMs + 60,
+    const timers: number[] = [];
+    // 1. Pre-spin lag — the reel sits still on cell[0], giving the player a beat to
+    //    register "NEXT UP…" before the wheel starts turning. Using a timeout instead
+    //    of RAF because we explicitly want ~750ms, not ~2 frames.
+    timers.push(
+      window.setTimeout(() => setPhase("spinning"), PRE_SPIN_DELAY_MS),
     );
-    const doneTimer = window.setTimeout(onDone, durationMs);
+    // 2. Spin completes → land. Small +60ms buffer so the CSS transition finishes
+    //    before we swap on the "is-landed" styling.
+    timers.push(
+      window.setTimeout(
+        () => setPhase("landed"),
+        PRE_SPIN_DELAY_MS + spinMs + 60,
+      ),
+    );
+    // 3. Dwell completes → caller advances the FSM.
+    timers.push(window.setTimeout(onDone, durationMs));
     return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      window.clearTimeout(landTimer);
-      window.clearTimeout(doneTimer);
+      timers.forEach((id) => window.clearTimeout(id));
     };
   }, [spinMs, durationMs, onDone]);
 
@@ -94,7 +106,7 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
   // End position: item[N-1] (= target) centered in the viewport.
   const initialY = REEL_CELL_H;
   const endY = REEL_CELL_H * (2 - reelItems.length);
-  const translateY = phase === "start" ? initialY : endY;
+  const translateY = phase === "idle" ? initialY : endY;
 
   return (
     <div className="tournament-screen" aria-live="polite">
@@ -114,9 +126,13 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
             className="selector-reel"
             style={{
               transform: `translateY(${translateY}px)`,
+              // cubic-bezier(0.7, 0.0, 0.2, 1.0) is a strong ease-in-out: the reel
+              // starts gently, accelerates through the middle of the spin, then
+              // decelerates sharply onto the target — matching how a real prize wheel
+              // feels, rather than the fast-then-slow "coast" of a pure ease-out.
               transition:
                 phase === "spinning"
-                  ? `transform ${spinMs}ms cubic-bezier(0.1, 0.75, 0.25, 1)`
+                  ? `transform ${spinMs}ms cubic-bezier(0.7, 0.0, 0.2, 1.0)`
                   : "none",
             }}
           >
@@ -136,7 +152,11 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
         </div>
 
         <p className="tournament-meta">
-          {phase === "landed" ? "Read your briefing next…" : "Randomising…"}
+          {phase === "idle"
+            ? "Get ready…"
+            : phase === "landed"
+              ? "Read your briefing next…"
+              : "Randomising…"}
         </p>
       </div>
     </div>

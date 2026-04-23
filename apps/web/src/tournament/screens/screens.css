@@ -746,6 +746,74 @@
   inset: 0;
 }
 
+/* ── Stage clock ────────────────────────────────────────────────────
+ * Countdown badge pinned dead-centre at the top of the stage, floating between the
+ * title (left) and player chips (right). Absolute position keeps it from disturbing
+ * the header's flex layout, and pointer-events are off so nothing blocks clicks into
+ * the game beneath. Turns red + pulses in the last 5s as a "hurry up" cue.
+ */
+.stage-clock {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-1.5deg);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.45rem 1.1rem;
+  background: var(--color-fg);
+  color: var(--color-card);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  min-width: 96px;
+  justify-content: center;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.stage-clock__num {
+  font-size: 1.45rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-clock__unit {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.stage-clock.is-warning {
+  background: var(--color-coral, #ff4d4d);
+  color: #fff;
+  animation: stage-clock-pulse 520ms ease-in-out infinite alternate;
+}
+
+.stage-clock.is-over {
+  background: var(--color-border);
+  color: var(--color-card);
+  opacity: 0.8;
+}
+
+@keyframes stage-clock-pulse {
+  from {
+    transform: translateX(-50%) rotate(-1.5deg) scale(1);
+  }
+  to {
+    transform: translateX(-50%) rotate(-1.5deg) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-clock.is-warning {
+    animation: none;
+  }
+}
+
 /* ── Dev overlay ────────────────────────────────────────────────────── */
 .dev-overlay {
   position: fixed;

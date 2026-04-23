@@ -31,7 +31,7 @@ import {
   type RoomChannel,
 } from "@pose-royale/sdk";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEDUPE_WHEN_REGISTRY_SIZE_GTE, GAUNTLET } from "./config.js";
+import { DEDUPE_WHEN_REGISTRY_SIZE_GTE, GAUNTLET, SELECTOR_SEC } from "./config.js";
 import { makePlan, SUDDEN_DEATH_DURATION_MS, type GauntletPlan, type Phase } from "./phases.js";
 import { pickSetlist } from "./pickSetlist.js";
 import { loadGame, REGISTRY, type RegistryEntry } from "./registry.js";
@@ -136,15 +136,16 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
 
   // ── Core state ────────────────────────────────────────────────────────
   // Initial phase: empty registry → "final" so the empty-notice renders. Otherwise open
-  // directly on the round-0 briefing — the selector only runs *between* rounds, after
-  // the player has finished a game and we're revealing which game comes next.
+  // on the selector so every round (including round 1) starts with the randomiser spinning
+  // up the next game's reveal before we drop into its briefing.
   const [phase, setPhase] = useState<Phase>(() =>
     registry.length === 0
       ? { kind: "final" }
       : {
-          kind: "briefing",
+          kind: "selector",
           roundIndex: 0,
-          shownAt: now(),
+          startsAt: now(),
+          durationMs: SELECTOR_SEC * 1000,
         },
   );
   const [results, setResults] = useState<readonly RoundResult[]>([]);
@@ -299,8 +300,14 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
     setResults([]);
     setSuddenDeathGameId(null);
     setLiveScores(null);
-    // Rematch drops straight into the round-0 briefing — same as a fresh gauntlet.
-    setPhase({ kind: "briefing", roundIndex: 0, shownAt: now() });
+    // Rematch kicks off with a fresh selector spin for round 0 — same as a brand-new
+    // gauntlet.
+    setPhase({
+      kind: "selector",
+      roundIndex: 0,
+      startsAt: now(),
+      durationMs: SELECTOR_SEC * 1000,
+    });
   }, [now]);
 
   // ── Derived render-time data ──────────────────────────────────────────

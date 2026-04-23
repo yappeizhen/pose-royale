@@ -12,8 +12,14 @@ export const GAUNTLET = {
   maxCumulative: 3 * 1000,
 } as const;
 
-/** How long the animated game-selector runs before landing on the pre-picked game. */
-export const SELECTOR_SEC = 2.6;
+/**
+ * How long the animated game-selector runs end-to-end before transitioning to the
+ * briefing. Inside `GameSelector` the budget is split as:
+ *   PRE_SPIN_DELAY_MS (anticipation) + spinMs (ease-in-out reel) + LANDED_DWELL_MS (pause).
+ * Keep this value in sync with the sum of those three phases so the reel never gets
+ * squeezed into a teleport.
+ */
+export const SELECTOR_SEC = 6.0;
 
 /**
  * Briefing-card idle timeout — if the player doesn't tap "Let's go!" within this window,

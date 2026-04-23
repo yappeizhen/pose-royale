@@ -1,6 +1,6 @@
 import { HandTracker } from "@pose-royale/cv";
 import type { Player } from "@pose-royale/sdk";
-import { BackButton, BackScope, CameraGate } from "@pose-royale/ui";
+import { CameraGate } from "@pose-royale/ui";
 import { useEffect, useRef, useState } from "react";
 import "./tournament/screens/screens.css";
 import { TournamentRunner } from "./tournament/TournamentRunner.js";
@@ -85,12 +85,9 @@ function Shell({ stream, hands }: { stream: MediaStream; hands: HandTracker }) {
     );
   }
 
-  return (
-    <BackScope action={{ kind: "navigate", to: "/" }}>
-      <BackButton />
-      <Home stream={stream} onStart={() => setScreen("tournament")} />
-    </BackScope>
-  );
+  // Home is the root screen — no back button, since there's nowhere to go back to.
+  // TournamentRunner mounts its own BackScope / BackButton for in-game exit + forfeit.
+  return <Home stream={stream} onStart={() => setScreen("tournament")} />;
 }
 
 function randomToken(): string {
