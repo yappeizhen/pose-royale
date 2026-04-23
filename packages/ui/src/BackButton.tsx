@@ -76,14 +76,16 @@ export function BackButton({
         alignItems: "center",
         gap: 6,
         padding: "0.5rem 0.9rem",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.25)",
-        background: "rgba(0,0,0,0.45)",
-        color: "white",
+        borderRadius: "var(--radius-pill)",
+        border: "1px solid var(--color-border-strong)",
+        background: "var(--color-surface-overlay)",
+        color: "var(--color-fg)",
         fontWeight: 500,
-        fontSize: "0.9rem",
+        fontSize: "var(--fs-sm)",
+        fontFamily: "inherit",
         cursor: "pointer",
-        backdropFilter: "blur(8px)",
+        backdropFilter: "var(--blur-surface)",
+        WebkitBackdropFilter: "var(--blur-surface)",
       }}
     >
       <span aria-hidden>←</span>

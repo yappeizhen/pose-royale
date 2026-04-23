@@ -37,11 +37,13 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   // ── DOM scaffolding ───────────────────────────────────────────────────────
-  // GameStage mounts us into a `position:absolute; inset:0` host. Don't clobber
-  // that — if we force it to `relative`, it drops out of the fixed parent's
-  // containing block and collapses to height:0 (since all our children are
-  // absolute), and FruitGame.handleResize then no-ops on clientHeight===0.
-  if (!el.style.position) el.style.position = "relative";
+  // GameStage mounts us into a `position:absolute; inset:0` host (via the
+  // .stage-host class). Only force `position:relative` if the host is still
+  // `static` — clobbering it otherwise would collapse the host to height:0
+  // (all our children are absolute) and FruitGame.handleResize would no-op.
+  if (getComputedStyle(el).position === "static") {
+    el.style.position = "relative";
+  }
   el.style.overflow = "hidden";
 
   // Three.js fruit canvas (fills host). NOT mirrored — the webcam background is

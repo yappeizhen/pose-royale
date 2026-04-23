@@ -57,8 +57,8 @@ export function OpponentBubble({
         borderRadius: "50%",
         overflow: "hidden",
         border: `3px solid ${color}`,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-        background: "rgba(0,0,0,0.6)",
+        boxShadow: "var(--shadow-card)",
+        background: "var(--color-surface-overlay)",
         zIndex: 40,
         ...anchorStyle,
       }}
@@ -86,8 +86,8 @@ export function OpponentBubble({
             placeItems: "center",
             fontFamily: "var(--font-display, system-ui)",
             fontSize: size * 0.3,
-            color: "#fff",
-            animation: state === "connecting" ? "opponent-pulse 1.4s ease-in-out infinite" : "none",
+            color: "var(--color-fg)",
+            animation: state === "connecting" ? "pose-pulse 1.4s ease-in-out infinite" : "none",
           }}
         >
           {name.slice(0, 1).toUpperCase()}
@@ -102,7 +102,7 @@ export function OpponentBubble({
           bottom: 0,
           padding: "6px 10px",
           background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
-          color: "#fff",
+          color: "var(--color-fg)",
           fontSize: 13,
           display: "flex",
           justifyContent: "space-between",
@@ -111,9 +111,7 @@ export function OpponentBubble({
       >
         <span style={{ fontWeight: 600 }}>{name}</span>
         {score !== null ? (
-          <span style={{ fontVariantNumeric: "tabular-nums" }}>
-            {Math.round(score * 1000)}
-          </span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{Math.round(score * 1000)}</span>
         ) : null}
       </div>
 
@@ -127,8 +125,8 @@ export function OpponentBubble({
             padding: "3px 8px",
             fontSize: 10,
             textAlign: "center",
-            background: "rgba(255,80,80,0.85)",
-            color: "#fff",
+            background: "rgba(255,84,112,0.85)",
+            color: "var(--color-fg)",
             letterSpacing: 0.5,
             textTransform: "uppercase",
           }}
@@ -136,13 +134,6 @@ export function OpponentBubble({
           Video offline
         </div>
       ) : null}
-
-      <style>{`
-        @keyframes opponent-pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }

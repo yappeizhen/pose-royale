@@ -29,7 +29,7 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
 
   return (
     <div className="tournament-screen">
-      <div className="tournament-stack" style={{ width: "100%" }}>
+      <div className="tournament-stack" style={{ width: "100%", gap: "var(--space-3)" }}>
         <span className="tournament-pill">The Gauntlet · {manifests.length} rounds</span>
         <h1 className="tournament-title">Your setlist</h1>
         <div className="tournament-demo-grid">
@@ -37,8 +37,8 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
             <DemoCard key={`${m.id}-${i}`} manifest={m} roundIndex={i} />
           ))}
         </div>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <span style={{ opacity: 0.6 }}>Auto-continues in {remaining}s</span>
+        <div className="tournament-hstack">
+          <span className="tournament-meta">Auto-continues in {remaining}s</span>
           <button className="tournament-button" onClick={onDone}>
             Skip
           </button>
@@ -51,7 +51,14 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
 function DemoCard({ manifest, roundIndex }: { manifest: GameManifest; roundIndex: number }) {
   return (
     <article className="tournament-demo-card">
-      <header style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: "var(--space-1)",
+        }}
+      >
         <h3>
           Round {roundIndex + 1} · {manifest.name}
         </h3>
@@ -62,18 +69,12 @@ function DemoCard({ manifest, roundIndex }: { manifest: GameManifest; roundIndex
         autoPlay
         loop
         playsInline
-        style={{
-          width: "100%",
-          aspectRatio: "16 / 9",
-          borderRadius: 10,
-          objectFit: "cover",
-          background: "#000",
-        }}
+        className="tournament-video"
       />
-      <p style={{ margin: 0, opacity: 0.8 }}>{manifest.demo.howToPlay}</p>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <p className="how-to">{manifest.demo.howToPlay}</p>
+      <ul className="controls">
         {manifest.demo.controls.map((c, i) => (
-          <li key={i} style={{ fontSize: "0.85rem", opacity: 0.75 }}>
+          <li key={i}>
             <span aria-hidden>{c.icon}</span> {c.label}
           </li>
         ))}

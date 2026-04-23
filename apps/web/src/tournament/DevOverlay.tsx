@@ -87,29 +87,11 @@ export function DevOverlay({ stats }: Props) {
   ];
 
   return (
-    <div
-      role="status"
-      style={{
-        position: "fixed",
-        bottom: 12,
-        right: 12,
-        zIndex: 2000,
-        padding: "0.5rem 0.75rem",
-        borderRadius: 8,
-        border: "1px solid rgba(255,255,255,0.15)",
-        background: "rgba(0,0,0,0.7)",
-        color: "#d4f7ff",
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        fontSize: 11,
-        lineHeight: 1.45,
-        pointerEvents: "none",
-        backdropFilter: "blur(6px)",
-      }}
-    >
-      <strong style={{ display: "block", marginBottom: 4, color: "white" }}>dev · ~ to toggle</strong>
+    <div role="status" className="dev-overlay">
+      <strong className="dev-overlay__title">dev · ~ to toggle</strong>
       {rows.map(([k, v]) => (
-        <div key={k} style={{ display: "flex", gap: 8 }}>
-          <span style={{ opacity: 0.6, minWidth: 60 }}>{k}</span>
+        <div key={k} className="dev-overlay__row">
+          <span className="dev-overlay__key">{k}</span>
           <span>{v}</span>
         </div>
       ))}

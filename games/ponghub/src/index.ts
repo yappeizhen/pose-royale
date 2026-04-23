@@ -24,7 +24,13 @@ import { manifest } from "./manifest.js";
 
 function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   // ── DOM ──────────────────────────────────────────────────────────────────
-  el.style.position = el.style.position || "relative";
+  // GameStage mounts us into a `position:absolute; inset:0` host (via the
+  // .stage-host class). Only force `position:relative` if the host is still
+  // `static` — clobbering it otherwise would collapse the host to height:0
+  // and our absolutely-positioned canvas would render at 0×0.
+  if (getComputedStyle(el).position === "static") {
+    el.style.position = "relative";
+  }
   el.style.overflow = "hidden";
 
   const canvas = document.createElement("canvas");

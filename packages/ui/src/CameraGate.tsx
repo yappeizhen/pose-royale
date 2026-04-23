@@ -106,55 +106,27 @@ export function CameraGate({ children, requestStream = defaultRequest }: CameraG
       role="dialog"
       aria-modal="true"
       aria-label="Camera access required"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        padding: "2rem",
-        textAlign: "center",
-        gap: "1rem",
-        background: "radial-gradient(circle at 50% 30%, #1a1a2e, #0a0a15)",
-        color: "white",
-        fontFamily: "system-ui, sans-serif",
-      }}
+      className="app-backdrop"
     >
-      <div aria-hidden style={{ fontSize: "4rem" }}>
-        📸
-      </div>
-      <h1 style={{ fontSize: "1.75rem", margin: 0 }}>
-        {state.status === "requesting"
-          ? "Requesting camera…"
-          : state.status === "denied"
-            ? "Pose Royale needs your camera"
+      <div className="stack">
+        <div aria-hidden style={{ fontSize: "3.5rem" }}>
+          📸
+        </div>
+        <h1>
+          {state.status === "requesting"
+            ? "Requesting camera…"
             : "Pose Royale needs your camera"}
-      </h1>
-      {state.status === "denied" && (
-        <p style={{ maxWidth: 420, opacity: 0.8, margin: 0 }}>{state.message}</p>
-      )}
-      {state.status === "denied" && (
-        <button
-          type="button"
-          onClick={request}
-          style={{
-            marginTop: "0.5rem",
-            padding: "0.75rem 1.5rem",
-            borderRadius: 999,
-            border: "none",
-            background: "white",
-            color: "#0a0a15",
-            fontWeight: 600,
-            fontSize: "1rem",
-            cursor: "pointer",
-          }}
-        >
-          Try again
-        </button>
-      )}
-      {state.status === "requesting" && (
-        <p style={{ opacity: 0.6, margin: 0 }}>Click “Allow” on the browser prompt.</p>
-      )}
+        </h1>
+        {state.status === "denied" && <p>{state.message}</p>}
+        {state.status === "denied" && (
+          <button type="button" onClick={request} className="tournament-button accent">
+            Try again
+          </button>
+        )}
+        {state.status === "requesting" && (
+          <p style={{ color: "var(--color-fg-subtle)" }}>Click “Allow” on the browser prompt.</p>
+        )}
+      </div>
     </div>
   );
 }

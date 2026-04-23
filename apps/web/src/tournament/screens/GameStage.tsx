@@ -80,43 +80,28 @@ export function GameStage({
 
   return (
     // Transparent root — the webcam background in App.tsx stays visible behind the game.
-    <div style={{ position: "fixed", inset: 0, background: "transparent" }}>
-      <header
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          padding: "0.5rem 1rem",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "0.75rem",
-          color: "white",
-          zIndex: 10,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)",
-          pointerEvents: "none",
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}>{heading}</span>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+    <div className="stage-root">
+      <header className="stage-header">
+        <span className="title">{heading}</span>
+        <div className="chips">
           {players.map((p) => (
             <span
               key={p.id}
-              style={{
-                padding: "0.15rem 0.5rem",
-                borderRadius: 999,
-                fontSize: "0.8rem",
-                background: `${p.color}33`,
-                color: p.color,
-                border: `1px solid ${p.color}66`,
-              }}
+              className="stage-chip"
+              style={
+                {
+                  "--stage-chip-bg": `${p.color}33`,
+                  "--stage-chip-fg": p.color,
+                  "--stage-chip-border": `${p.color}66`,
+                } as React.CSSProperties
+              }
             >
               {p.name}
             </span>
           ))}
         </div>
       </header>
-      <div ref={hostRef} style={{ position: "absolute", inset: 0 }} />
+      <div ref={hostRef} className="stage-host" />
     </div>
   );
 }

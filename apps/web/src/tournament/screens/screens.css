@@ -1,113 +1,359 @@
-/* Shared transitions + layout primitives for tournament screens. */
+/* Tournament-screen primitives — every token here comes from index.css. */
 
+/* ── Screen container (reveal / countdown / interlude / final) ──────── */
 .tournament-screen {
   position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 1.5rem;
-  color: white;
-  /* Semi-transparent so the webcam background shows through during reveal / interlude /
-     final — keeps the player visible on stage between rounds. */
-  background: radial-gradient(
-    circle at 50% 30%,
-    rgba(26, 26, 46, 0.82),
-    rgba(10, 10, 21, 0.92)
-  );
-  animation: tournament-fade-in 240ms ease-out;
+  padding: var(--space-4);
+  color: var(--color-fg);
+  /* Semi-transparent so the webcam background shows through between rounds. */
+  background: var(--backdrop-screen);
+  animation: pose-fade-in 240ms ease-out;
+}
+
+.tournament-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  text-align: center;
+}
+
+.tournament-hstack {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ── Typography ─────────────────────────────────────────────────────── */
+.tournament-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.tournament-title.accent {
+  color: var(--color-accent-2);
 }
 
 .tournament-countdown-digit {
   font-family: var(--font-display);
-  font-size: clamp(8rem, 18vw, 16rem);
+  font-size: var(--fs-display);
   font-weight: 700;
   line-height: 1;
   animation: tournament-pop 700ms ease-out;
-}
-
-.tournament-title {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  margin: 0;
+  text-shadow: 0 12px 48px rgba(255, 47, 106, 0.25);
 }
 
 .tournament-pill {
   display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--accent-2);
+  color: var(--color-accent-2);
+  font-weight: 500;
+}
+
+.tournament-meta {
+  color: var(--color-fg-subtle);
+  font-size: var(--fs-sm);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────── */
+.tournament-card {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-inset-hi);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tournament-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+
+.tournament-card p {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--fs-sm);
+}
+
+.tournament-card.gradient {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, var(--color-accent-2-soft) 0%, var(--color-accent-soft) 100%),
+    var(--color-bg-raised);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-float);
+  gap: var(--space-2);
 }
 
 .tournament-demo-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  width: min(900px, 100%);
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  width: min(960px, 100%);
 }
 
 .tournament-demo-card {
-  padding: 1rem;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-inset-hi);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-1);
+  text-align: left;
 }
 
 .tournament-demo-card h3 {
   margin: 0;
   font-family: var(--font-display);
+  font-size: var(--fs-lg);
 }
 
+.tournament-demo-card .how-to {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--fs-sm);
+}
+
+.tournament-demo-card .controls {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.tournament-demo-card .controls li {
+  font-size: var(--fs-xs);
+  color: var(--color-fg-muted);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+}
+
+/* ── Video surfaces ─────────────────────────────────────────────────── */
+.tournament-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-bg-deep);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
 .tournament-button {
-  padding: 0.75rem 1.5rem;
-  border-radius: 999px;
-  border: none;
-  background: white;
-  color: #0a0a15;
+  padding: 0.8rem 1.6rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--color-fg);
+  color: var(--color-bg);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--fs-body);
+  font-family: inherit;
   cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.tournament-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.tournament-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.tournament-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tournament-button.ghost {
   background: transparent;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--color-fg);
+  border-color: var(--color-border-strong);
+  box-shadow: none;
 }
 
+.tournament-button.ghost:hover:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-fg-muted);
+}
+
+.tournament-button.accent {
+  background: linear-gradient(135deg, var(--color-accent) 0%, #ff6b9a 100%);
+  color: var(--color-fg);
+  border-color: rgba(255, 107, 154, 0.55);
+  box-shadow: 0 10px 30px rgba(255, 47, 106, 0.35);
+}
+
+/* ── Scoreboard ─────────────────────────────────────────────────────── */
 .tournament-scoreboard {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-2);
   width: min(520px, 100%);
 }
 
 .tournament-scoreboard .row {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: center;
   padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
-@keyframes tournament-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.tournament-scoreboard .row strong {
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
+.tournament-scoreboard .row .delta {
+  text-align: right;
+  color: var(--color-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-scoreboard .row .total {
+  text-align: right;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg);
+}
+
+.tournament-scoreboard .row .total.final {
+  font-size: 1.5rem;
+}
+
+/* ── Stage (the playing-phase host) ─────────────────────────────────── */
+.stage-root {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+}
+
+.stage-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-fg);
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent);
+  pointer-events: none;
+}
+
+.stage-header .title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.stage-header .chips {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stage-chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  background: var(--stage-chip-bg, var(--color-surface-strong));
+  color: var(--stage-chip-fg, var(--color-fg));
+  border: 1px solid var(--stage-chip-border, var(--color-border-strong));
+}
+
+.stage-host {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Dev overlay ────────────────────────────────────────────────────── */
+.dev-overlay {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 2000;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-strong);
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--color-accent-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+  backdrop-filter: var(--blur-overlay);
+}
+
+.dev-overlay__title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-fg);
+}
+
+.dev-overlay__row {
+  display: flex;
+  gap: 8px;
+}
+
+.dev-overlay__key {
+  color: var(--color-fg-subtle);
+  min-width: 60px;
+}
+
+/* ── Crash fallback ─────────────────────────────────────────────────── */
+.crash-notice {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-fg);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-md);
+}
+
+.crash-notice__title {
+  margin: 0;
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+
+.crash-notice__body {
+  margin: var(--space-1) 0 0;
+  color: var(--color-fg-muted);
+}
+
+/* ── Animations ─────────────────────────────────────────────────────── */
 @keyframes tournament-pop {
   0% {
     opacity: 0;
@@ -120,12 +366,4 @@
   100% {
     transform: scale(1);
   }
-}
-
-.tournament-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: center;
-  text-align: center;
 }

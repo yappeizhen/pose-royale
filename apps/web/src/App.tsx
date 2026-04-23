@@ -2,6 +2,7 @@ import { HandTracker } from "@pose-royale/cv";
 import type { Player } from "@pose-royale/sdk";
 import { BackButton, BackScope, CameraGate } from "@pose-royale/ui";
 import { useEffect, useRef, useState } from "react";
+import "./tournament/screens/screens.css";
 import { TournamentRunner } from "./tournament/TournamentRunner.js";
 
 type Screen = "home" | "tournament";
@@ -118,18 +119,9 @@ function WebcamBackground({ stream }: { stream: MediaStream }) {
       playsInline
       autoPlay
       aria-hidden
-      style={{
-        position: "fixed",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        // Mirror so the player sees themselves in a natural "look at yourself" orientation.
-        // Games that consume ctx.hands already account for the mirror when they do `1 - lm.x`.
-        transform: "scaleX(-1)",
-        zIndex: 0,
-        background: "#000",
-      }}
+      // Mirror so the player sees themselves in a natural "look at yourself" orientation.
+      // Games that consume ctx.hands already account for the mirror when they do `1 - lm.x`.
+      className="webcam-bg"
     />
   );
 }
@@ -148,51 +140,26 @@ function Home({ stream, onStart }: { stream: MediaStream; onStart: () => void })
   }, [stream]);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: "2rem",
-        gap: "1rem",
-      }}
-    >
-      <video
-        ref={videoRef}
-        muted
-        playsInline
-        autoPlay
-        style={{
-          width: "min(90vw, 640px)",
-          aspectRatio: "16 / 9",
-          objectFit: "cover",
-          borderRadius: 16,
-          transform: "scaleX(-1)",
-          background: "#000",
-        }}
-      />
-      <h1 style={{ fontFamily: "var(--font-display)", margin: 0, fontSize: "2.5rem" }}>
-        Pose Royale
-      </h1>
-      <p style={{ margin: 0, color: "var(--fg-1)", textAlign: "center", maxWidth: 480 }}>
-        A gauntlet of 3 minigames × 30s each. Your webcam is the controller.
+    <main className="app-home">
+      <div className="app-home__hero">
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          autoPlay
+          className="app-home__video"
+        />
+        <div className="app-home__glow" aria-hidden />
+      </div>
+      <span className="tournament-pill">Gauntlet · 3 rounds · 30s each</span>
+      <h1 className="app-home__title">Pose Royale</h1>
+      <p className="app-home__subtitle">
+        Three CV-powered minigames in a row. Your webcam is the controller.
       </p>
-      <button
-        onClick={onStart}
-        style={{
-          padding: "0.9rem 2rem",
-          borderRadius: 999,
-          border: "none",
-          fontSize: "1.05rem",
-          fontWeight: 600,
-          background: "white",
-          color: "#0a0a15",
-          cursor: "pointer",
-        }}
-      >
+      <button onClick={onStart} className="tournament-button accent app-home__cta">
         Start Gauntlet (Solo)
       </button>
-      <small style={{ opacity: 0.4 }}>
+      <small className="app-home__hint">
         dev · press <kbd>~</kbd> during play for the debug overlay
       </small>
     </main>
@@ -201,21 +168,10 @@ function Home({ stream, onStart }: { stream: MediaStream; onStart: () => void })
 
 function CenterNotice({ title, message }: { title: string; message: string }) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "grid",
-        placeItems: "center",
-        padding: "2rem",
-        background: "radial-gradient(circle at 50% 30%, #1a1a2e, #0a0a15)",
-        color: "white",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <h1 style={{ margin: 0, fontSize: "1.5rem" }}>{title}</h1>
-        <p style={{ margin: 0, opacity: 0.75, maxWidth: 420 }}>{message}</p>
+    <div className="app-backdrop" role="status">
+      <div className="stack">
+        <h1>{title}</h1>
+        <p>{message}</p>
       </div>
     </div>
   );

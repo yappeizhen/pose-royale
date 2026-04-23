@@ -1,16 +1,110 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Pose Royale — design tokens + global primitives.
+
+   Everything visual in the app ultimately bottoms out in these tokens. They
+   live on :root so `@pose-royale/ui` components (BackButton, CameraGate,
+   OpponentBubble) can consume them without bundling CSS — CSS custom
+   properties inherit, so any `var(--color-fg)` inside a UI component picks
+   up the app-level theme automatically.
+
+   Naming conventions:
+     • `--color-…` — semantic color (fg, bg, surface, border, accent).
+     • `--fs-…`    — font sizes, h1/h2/h3/body/sm/xs scale.
+     • `--space-…` — 4px-based spacing ramp (space-1 = 0.25rem, ...).
+     • `--radius-…`— corner ramp (xs/sm/md/lg/pill).
+     • `--shadow-…`— layered shadow scale.
+   ────────────────────────────────────────────────────────────────────────── */
+
 :root {
   color-scheme: dark;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* ── Typography ──────────────────────────────────────────────── */
   --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
-  --bg-0: #0a0a15;
-  --bg-1: #12121f;
-  --fg-0: #ffffff;
-  --fg-1: rgba(255, 255, 255, 0.72);
-  --accent: #ff2f6a;
-  --accent-2: #7dd3fc;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.85rem;
+  --fs-body: 1rem;
+  --fs-lg: 1.15rem;
+  --fs-h2: clamp(1.5rem, 3vw, 2.25rem);
+  --fs-h1: clamp(2rem, 5vw, 3.5rem);
+  --fs-display: clamp(8rem, 18vw, 16rem);
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+
+  /* ── Spacing ─────────────────────────────────────────────────── */
+  --space-0: 0.25rem;
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --space-6: 3rem;
+
+  /* ── Colors ──────────────────────────────────────────────────── */
+  --color-bg: #0a0a15;
+  --color-bg-raised: #12121f;
+  --color-bg-deep: #06060e;
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-surface-strong: rgba(255, 255, 255, 0.07);
+  --color-surface-overlay: rgba(0, 0, 0, 0.5);
+  --color-fg: #ffffff;
+  --color-fg-muted: rgba(255, 255, 255, 0.72);
+  --color-fg-subtle: rgba(255, 255, 255, 0.48);
+  --color-fg-faint: rgba(255, 255, 255, 0.32);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+  --color-accent: #ff2f6a;
+  --color-accent-soft: rgba(255, 47, 106, 0.14);
+  --color-accent-2: #7dd3fc;
+  --color-accent-2-soft: rgba(125, 211, 252, 0.16);
+  --color-warn: #ffd166;
+  --color-danger: #ff5470;
+  --color-focus-ring: rgba(125, 211, 252, 0.6);
+
+  /* ── Radii ───────────────────────────────────────────────────── */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* ── Shadows ─────────────────────────────────────────────────── */
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* ── Effects ─────────────────────────────────────────────────── */
+  --blur-surface: blur(12px);
+  --blur-overlay: blur(6px);
+
+  /* ── Backdrops ───────────────────────────────────────────────── */
+  --backdrop-radial: radial-gradient(
+    circle at 50% 22%,
+    rgba(255, 47, 106, 0.22) 0%,
+    rgba(125, 211, 252, 0.1) 32%,
+    var(--color-bg) 72%
+  );
+  --backdrop-screen: radial-gradient(
+    circle at 50% 30%,
+    rgba(26, 26, 46, 0.82),
+    rgba(10, 10, 21, 0.92)
+  );
+
+  /* ── Legacy aliases (still referenced by some callsites) ─────── */
+  --bg-0: var(--color-bg);
+  --bg-1: var(--color-bg-raised);
+  --fg-0: var(--color-fg);
+  --fg-1: var(--color-fg-muted);
+  --accent: var(--color-accent);
+  --accent-2: var(--color-accent-2);
+
+  font-family: var(--font-body);
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -20,10 +114,182 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--bg-0);
-  color: var(--fg-0);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button {
   font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Global utility classes — shared by the app shell and UI package.
+   These intentionally avoid any tournament-specific names so they
+   can be reused across solo/lobby/multiplayer flows without churn.
+   ────────────────────────────────────────────────────────────── */
+
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: var(--backdrop-radial), var(--color-bg);
+  color: var(--color-fg);
+  text-align: center;
+}
+
+.app-backdrop .stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  max-width: 480px;
+}
+
+.app-backdrop h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+}
+
+.app-backdrop p {
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   App shell — home screen + webcam background.
+   ────────────────────────────────────────────────────────────── */
+
+.webcam-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  z-index: 0;
+  background: var(--color-bg-deep);
+}
+
+.app-home {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-2);
+  text-align: center;
+  background: var(--backdrop-radial), var(--color-bg);
+}
+
+.app-home__hero {
+  position: relative;
+  width: min(90vw, 640px);
+  margin-bottom: var(--space-2);
+}
+
+.app-home__video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  transform: scaleX(-1);
+  background: var(--color-bg-deep);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-float);
+  position: relative;
+  z-index: 1;
+}
+
+.app-home__glow {
+  position: absolute;
+  inset: -20% -20% -30%;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(255, 47, 106, 0.35), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(125, 211, 252, 0.3), transparent 60%);
+  filter: blur(40px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.app-home__title {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-fg) 0%, var(--color-accent-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-home__subtitle {
+  margin: 0;
+  color: var(--color-fg-muted);
+  max-width: 480px;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+
+.app-home__cta {
+  margin-top: var(--space-2);
+}
+
+.app-home__hint {
+  color: var(--color-fg-faint);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  margin-top: var(--space-2);
+}
+
+.app-home__hint kbd {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Keyframes — scoped global so `@pose-royale/ui` components can
+   reference them without bundling their own CSS.
+   ────────────────────────────────────────────────────────────── */
+
+@keyframes pose-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pose-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

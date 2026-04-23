@@ -32,17 +32,9 @@ export class GameBoundary extends Component<Props, State> {
     if (this.state.crashed) {
       return (
         this.props.fallback ?? (
-          <div
-            role="alert"
-            style={{
-              padding: "2rem",
-              textAlign: "center",
-              color: "white",
-              background: "rgba(255,47,106,0.15)",
-            }}
-          >
-            <p style={{ margin: 0, fontWeight: 600 }}>That round crashed — sorry!</p>
-            <p style={{ margin: "0.5rem 0 0", opacity: 0.7 }}>Scoring 0 and moving on…</p>
+          <div role="alert" className="crash-notice">
+            <p className="crash-notice__title">That round crashed — sorry!</p>
+            <p className="crash-notice__body">Scoring 0 and moving on…</p>
           </div>
         )
       );
