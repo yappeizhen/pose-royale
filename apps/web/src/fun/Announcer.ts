@@ -80,8 +80,11 @@ export class Announcer {
     if (n === 0) this.say("Go!", { pitch: 1.3, rate: 1.15 });
     else this.say(`${n}`, { rate: 1.2 });
   }
-  setlistReveal(first: string): void {
-    this.say(`Your gauntlet opens with ${first}. Get ready.`);
+  selectorSpin(index: number, total: number): void {
+    this.say(`Round ${index + 1} of ${total}. Randomizing.`, { rate: 1.15 });
+  }
+  briefing(name: string): void {
+    this.say(`${name}. Get ready.`);
   }
   roundStart(name: string, index: number, total: number): void {
     this.say(`Round ${index + 1} of ${total}. ${name}.`);

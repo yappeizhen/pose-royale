@@ -7,7 +7,7 @@
  * mid-sentence.
  */
 
-import type { GameManifest, Player } from "@pose-royale/sdk";
+import type { Player } from "@pose-royale/sdk";
 import { useEffect, useRef } from "react";
 import { Announcer } from "../fun/Announcer.js";
 import type { Phase } from "./phases.js";
@@ -16,7 +16,6 @@ import { leaderOf, type RoundResult } from "./scoreLedger.js";
 
 export interface UseAnnouncerOptions {
   phase: Phase;
-  manifests: readonly GameManifest[];
   results: readonly RoundResult[];
   players: readonly Player[];
   registry: readonly RegistryEntry[];
@@ -26,7 +25,6 @@ export interface UseAnnouncerOptions {
 
 export function useAnnouncer({
   phase,
-  manifests,
   results,
   players,
   registry,
@@ -39,13 +37,18 @@ export function useAnnouncer({
   useEffect(() => {
     const a = announcerRef.current;
     if (!a) return;
-    if (phase.kind === "reveal" && manifests[0]) {
-      a.setlistReveal(manifests[0].name);
+    if (phase.kind === "selector") {
+      // Speak "randomising" once at the start; the reveal itself fires after the spin.
+      if (phase.suddenDeath) a.suddenDeath();
+      else a.selectorSpin(phase.roundIndex, setlistLength);
+    } else if (phase.kind === "briefing") {
+      const gameId = gameIdForRound(phase.roundIndex);
+      const m = gameId ? registry.find((r) => r.id === gameId)?.manifest : undefined;
+      if (m) a.briefing(m.name);
     } else if (phase.kind === "countdown") {
       const gameId = gameIdForRound(phase.roundIndex);
       const m = gameId ? registry.find((r) => r.id === gameId)?.manifest : undefined;
-      if (phase.suddenDeath) a.suddenDeath();
-      else if (m) a.roundStart(m.name, phase.roundIndex, setlistLength);
+      if (m) a.roundStart(m.name, phase.roundIndex, setlistLength);
     } else if (phase.kind === "interlude") {
       const r = results[phase.justFinished];
       if (r) {
@@ -69,7 +72,7 @@ export function useAnnouncer({
           : null,
       );
     }
-  }, [phase, manifests, registry, results, players, setlistLength, gameIdForRound]);
+  }, [phase, registry, results, players, setlistLength, gameIdForRound]);
 
   useEffect(
     () => () => {

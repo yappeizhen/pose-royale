@@ -21,8 +21,8 @@ export class PongGame {
   private table: THREE.Group;
   private ball: THREE.Mesh;
   private ballShadow: THREE.Mesh;
-  private paddle1: THREE.Mesh;
-  private paddle2: THREE.Mesh;
+  private paddle1: THREE.Group;
+  private paddle2: THREE.Group;
 
   private physics: BallPhysics;
   private animationHandle: number | null = null;
@@ -269,16 +269,89 @@ export class PongGame {
     return mesh;
   }
 
-  private createPaddle(color: number): THREE.Mesh {
-    const geo = new THREE.CircleGeometry(PADDLE.RADIUS, 32);
-    const mat = new THREE.MeshToonMaterial({
+  /**
+   * Builds a real-looking table-tennis bat: a thin cylindrical head (the rubber face),
+   * a darker torus rim (wood edge), a wooden handle, and a small ferrule/grip-cap where
+   * the handle meets the head. Returned as a Group so position/rotation stays on the
+   * outer transform and opacity can be applied to every child material in one pass.
+   */
+  private createPaddle(color: number): THREE.Group {
+    const group = new THREE.Group();
+
+    // Head — a very thin cylinder gives depth from the side instead of a flat disk.
+    const headGeo = new THREE.CylinderGeometry(
+      PADDLE.RADIUS,
+      PADDLE.RADIUS,
+      PADDLE.THICKNESS * 2,
+      40,
+    );
+    // CylinderGeometry's axis is Y by default; rotate so the face lies in the XY plane
+    // (z is thickness), matching the old CircleGeometry orientation.
+    headGeo.rotateX(Math.PI / 2);
+    const headMat = new THREE.MeshToonMaterial({
       color,
       transparent: true,
       opacity: PADDLE.INACTIVE_OPACITY,
       side: THREE.DoubleSide,
     });
-    const mesh = new THREE.Mesh(geo, mat);
-    return mesh;
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.name = "paddle-head";
+    group.add(head);
+
+    // Rim — a dark torus hugging the head edge.
+    const rimGeo = new THREE.TorusGeometry(
+      PADDLE.RADIUS,
+      PADDLE.THICKNESS * 1.4,
+      12,
+      40,
+    );
+    const rimMat = new THREE.MeshToonMaterial({
+      color: 0x2d1f3d,
+      transparent: true,
+      opacity: PADDLE.INACTIVE_OPACITY,
+    });
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.name = "paddle-rim";
+    group.add(rim);
+
+    // Handle — warm wooden cylinder below the head.
+    const handleLength = PADDLE.RADIUS * 1.4;
+    const handleRadius = PADDLE.RADIUS * 0.2;
+    const handleGeo = new THREE.CylinderGeometry(
+      handleRadius,
+      handleRadius * 1.2,
+      handleLength,
+      18,
+    );
+    const handleMat = new THREE.MeshToonMaterial({
+      color: 0x8b5a2b,
+      transparent: true,
+      opacity: PADDLE.INACTIVE_OPACITY,
+    });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    // Position the handle so its top just tucks under the head.
+    handle.position.y = -(PADDLE.RADIUS + handleLength / 2 - PADDLE.THICKNESS);
+    handle.name = "paddle-handle";
+    group.add(handle);
+
+    // Ferrule — short dark collar at the head/handle junction.
+    const ferruleGeo = new THREE.CylinderGeometry(
+      handleRadius * 1.3,
+      handleRadius * 1.15,
+      handleLength * 0.2,
+      18,
+    );
+    const ferruleMat = new THREE.MeshToonMaterial({
+      color: 0x2d1f3d,
+      transparent: true,
+      opacity: PADDLE.INACTIVE_OPACITY,
+    });
+    const ferrule = new THREE.Mesh(ferruleGeo, ferruleMat);
+    ferrule.position.y = -(PADDLE.RADIUS + handleLength * 0.1);
+    ferrule.name = "paddle-ferrule";
+    group.add(ferrule);
+
+    return group;
   }
 
   setOnPoint(callback: PointCallback | null): void {
@@ -296,7 +369,7 @@ export class PongGame {
   }
 
   private updatePaddleMesh(
-    mesh: THREE.Mesh,
+    group: THREE.Object3D,
     paddle: PaddleState,
     player: Player,
   ): void {
@@ -306,13 +379,18 @@ export class PongGame {
       player === "player1"
         ? TABLE.LENGTH / 2 + 0.15
         : -TABLE.LENGTH / 2 - 0.15;
-    mesh.position.set(x, y, z);
-    mesh.rotation.x = player === "player1" ? -Math.PI / 6 : Math.PI / 6;
+    group.position.set(x, y, z);
+    group.rotation.x = player === "player1" ? -Math.PI / 6 : Math.PI / 6;
 
-    const mat = mesh.material as THREE.MeshToonMaterial;
-    mat.opacity = paddle.isActive
+    const opacity = paddle.isActive
       ? PADDLE.ACTIVE_OPACITY
       : PADDLE.INACTIVE_OPACITY;
+    group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        const mat = obj.material as THREE.MeshToonMaterial;
+        mat.opacity = opacity;
+      }
+    });
   }
 
   serve(player: Player): void {

@@ -18,7 +18,7 @@ export const manifest: GameManifest = {
   scoring: "cumulative",
   par: 5,
   demo: {
-    previewUrl: "/games/ponghub/preview.webm",
+    previewUrl: "/games/ponghub/preview.png",
     howToPlay:
       "Hold your open palm up, then move it to steer the paddle. A quick swing adds power and spin.",
     controls: [

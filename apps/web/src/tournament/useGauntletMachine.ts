@@ -8,9 +8,9 @@
  *
  * Responsibilities
  *   - Seeded setlist + GauntletPlan (plus `gameIdForRound` for sudden-death resolution).
- *   - Phase state (`reveal` → `countdown` → `playing` → `interlude` → `final`).
+ *   - Phase state: selector → briefing → countdown → playing → interlude → (selector | final).
  *   - Per-round GameRuntime creation + score snapshotting.
- *   - Module prefetch during countdowns.
+ *   - Module prefetch (triggered during selector + briefing, so we're warm by countdown).
  *   - Sudden-death pick (kept in state, base setlist stays immutable).
  *
  * Out of scope
@@ -30,7 +30,7 @@ import {
   type Player,
   type RoomChannel,
 } from "@pose-royale/sdk";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEDUPE_WHEN_REGISTRY_SIZE_GTE, GAUNTLET } from "./config.js";
 import { makePlan, SUDDEN_DEATH_DURATION_MS, type GauntletPlan, type Phase } from "./phases.js";
 import { pickSetlist } from "./pickSetlist.js";
@@ -80,11 +80,19 @@ export interface GauntletMachine {
   runtimeRef: React.RefObject<GameRuntime | null>;
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  startRound: (roundIndex: number) => void;
+  /** Selector finished animating → move to briefing. */
+  onSelectorDone: () => void;
+  /** Player tapped "Let's go!" on the briefing → move to countdown. */
+  onBriefingReady: () => void;
+  /** The 3-2-1 countdown reached zero → start gameplay. */
   onCountdownDone: () => void;
+  /** Round clock hit zero — finalize the live runtime and drop into interlude. */
   onRoundDeadline: () => void;
+  /** Player dismissed the interlude → advance to next selector or final. */
   continueFromInterlude: () => void;
+  /** Game module threw inside a GameBoundary. */
   onGameCrash: (roundIndex: number) => void;
+  /** Reset state and head back into a fresh selector for round 0. */
   rematch: () => void;
 }
 
@@ -127,8 +135,17 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
   }, []);
 
   // ── Core state ────────────────────────────────────────────────────────
+  // Initial phase: empty registry → "final" so the empty-notice renders. Otherwise open
+  // directly on the round-0 briefing — the selector only runs *between* rounds, after
+  // the player has finished a game and we're revealing which game comes next.
   const [phase, setPhase] = useState<Phase>(() =>
-    registry.length === 0 ? { kind: "final" } : { kind: "reveal" },
+    registry.length === 0
+      ? { kind: "final" }
+      : {
+          kind: "briefing",
+          roundIndex: 0,
+          shownAt: now(),
+        },
   );
   const [results, setResults] = useState<readonly RoundResult[]>([]);
   const [suddenDeathGameId, setSuddenDeathGameId] = useState<string | null>(null);
@@ -171,40 +188,52 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
     [seed, sessionId, players, localPlayerId, hands, net],
   );
 
+  // ── Module prefetch ───────────────────────────────────────────────────
+  // Whenever we enter a selector or briefing phase, kick off the import so the game
+  // binary is warm by the time the countdown fires. Centralised here so the transition
+  // helpers can stay pure.
+  useEffect(() => {
+    if (phase.kind !== "selector" && phase.kind !== "briefing") return;
+    const id = gameIdForRound(phase.roundIndex);
+    if (id) void loadModule(id).catch(() => {});
+  }, [phase, gameIdForRound, loadModule]);
+
   // ── Actions ───────────────────────────────────────────────────────────
-  const startRound = useCallback(
-    (roundIndex: number) => {
-      setPhase({
+  const onSelectorDone = useCallback(() => {
+    setPhase((p) => {
+      if (p.kind !== "selector") return p;
+      return {
+        kind: "briefing",
+        roundIndex: p.roundIndex,
+        shownAt: now(),
+        ...(p.suddenDeath ? { suddenDeath: true } : {}),
+      };
+    });
+  }, [now]);
+
+  const onBriefingReady = useCallback(() => {
+    setPhase((p) => {
+      if (p.kind !== "briefing") return p;
+      return {
         kind: "countdown",
-        roundIndex,
+        roundIndex: p.roundIndex,
         startsAt: now(),
         durationMs: plan.countdownMs,
-      });
-      const currentId = gameIdForRound(roundIndex);
-      if (currentId) void loadModule(currentId).catch(() => {});
-      const nextId = gameIdForRound(roundIndex + 1);
-      if (nextId) void loadModule(nextId).catch(() => {});
-    },
-    [now, plan.countdownMs, loadModule, gameIdForRound],
-  );
+        ...(p.suddenDeath ? { suddenDeath: true } : {}),
+      };
+    });
+  }, [now, plan.countdownMs]);
 
   const onCountdownDone = useCallback(() => {
     setPhase((p) => {
       if (p.kind !== "countdown") return p;
-      if (p.suddenDeath) {
-        return {
-          kind: "playing",
-          roundIndex: p.roundIndex,
-          startsAt: now(),
-          durationMs: SUDDEN_DEATH_DURATION_MS,
-          suddenDeath: true,
-        };
-      }
+      const durationMs = p.suddenDeath ? SUDDEN_DEATH_DURATION_MS : plan.roundDurationMs;
       return {
         kind: "playing",
         roundIndex: p.roundIndex,
         startsAt: now(),
-        durationMs: plan.roundDurationMs,
+        durationMs,
+        ...(p.suddenDeath ? { suddenDeath: true } : {}),
       };
     });
   }, [now, plan.roundDurationMs]);
@@ -226,12 +255,12 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
       if (p.kind !== "interlude") return p;
       const nextIndex = p.justFinished + 1;
       if (nextIndex < plan.setlist.length) {
-        startRound(nextIndex);
+        // Normal: open the selector to reveal the next round's game.
         return {
-          kind: "countdown",
+          kind: "selector",
           roundIndex: nextIndex,
           startsAt: now(),
-          durationMs: plan.countdownMs,
+          durationMs: plan.selectorMs,
         };
       }
       // Gauntlet complete — check for tie.
@@ -242,17 +271,17 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
         if (pickedId) {
           setSuddenDeathGameId(pickedId);
           return {
-            kind: "countdown",
+            kind: "selector",
             roundIndex: plan.setlist.length,
             startsAt: now(),
-            durationMs: plan.countdownMs,
+            durationMs: plan.selectorMs,
             suddenDeath: true,
           };
         }
       }
       return { kind: "final" };
     });
-  }, [plan, now, results, setlist, seed, startRound]);
+  }, [plan, now, results, setlist, seed]);
 
   const onGameCrash = useCallback(
     (roundIndex: number) => {
@@ -270,12 +299,16 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
     setResults([]);
     setSuddenDeathGameId(null);
     setLiveScores(null);
-    setPhase({ kind: "reveal" });
-  }, []);
+    // Rematch drops straight into the round-0 briefing — same as a fresh gauntlet.
+    setPhase({ kind: "briefing", roundIndex: 0, shownAt: now() });
+  }, [now]);
 
   // ── Derived render-time data ──────────────────────────────────────────
   const currentGameId =
-    phase.kind === "playing" || phase.kind === "countdown"
+    phase.kind === "selector" ||
+    phase.kind === "briefing" ||
+    phase.kind === "countdown" ||
+    phase.kind === "playing"
       ? gameIdForRound(phase.roundIndex)
       : null;
   const currentManifest = currentGameId
@@ -298,7 +331,8 @@ export function useGauntletMachine(opts: UseGauntletMachineOptions): GauntletMac
     gameIdForRound,
     contextForRound,
     runtimeRef,
-    startRound,
+    onSelectorDone,
+    onBriefingReady,
     onCountdownDone,
     onRoundDeadline,
     continueFromInterlude,

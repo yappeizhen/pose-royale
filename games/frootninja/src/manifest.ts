@@ -16,7 +16,7 @@ export const manifest: GameManifest = {
   scoring: "cumulative",
   par: 40,
   demo: {
-    previewUrl: "/games/frootninja/preview.webm",
+    previewUrl: "/games/frootninja/preview.png",
     howToPlay: "Swipe through fruit with your fingertip. Dodge the bombs!",
     controls: [
       { icon: "✋", label: "Index fingertip = blade" },

@@ -12,8 +12,15 @@ export const GAUNTLET = {
   maxCumulative: 3 * 1000,
 } as const;
 
-/** Demo-card reveal lifetime, in ms — or until the player hits Skip, whichever comes first. */
-export const DEMO_CARD_MS = 60_000;
+/** How long the animated game-selector runs before landing on the pre-picked game. */
+export const SELECTOR_SEC = 2.6;
+
+/**
+ * Briefing-card idle timeout — if the player doesn't tap "Let's go!" within this window,
+ * we auto-advance to the countdown. Long enough to read the how-to, short enough that an
+ * afk player can't freeze the tournament.
+ */
+export const BRIEFING_MIN_MS = 45_000;
 
 /** Countdown from "3" to "GO!". */
 export const COUNTDOWN_SEC = 3;

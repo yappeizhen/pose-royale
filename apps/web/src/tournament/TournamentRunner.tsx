@@ -7,16 +7,17 @@ import type {
   Player,
   RoomChannel,
 } from "@pose-royale/sdk";
-import { BackScope, OpponentBubble, type VideoState } from "@pose-royale/ui";
+import { BackButton, BackScope, OpponentBubble, type VideoState } from "@pose-royale/ui";
 import { useEffect, useState } from "react";
 import { DevOverlay, type DevOverlayStats } from "./DevOverlay.js";
 import { GameBoundary } from "./GameBoundary.js";
 import { leaderOf, type RoundResult } from "./scoreLedger.js";
 import { Countdown } from "./screens/Countdown.js";
 import { FinalScreen } from "./screens/FinalScreen.js";
+import { GameBriefing } from "./screens/GameBriefing.js";
+import { GameSelector } from "./screens/GameSelector.js";
 import { GameStage } from "./screens/GameStage.js";
 import { Interlude } from "./screens/Interlude.js";
-import { SetlistReveal } from "./screens/SetlistReveal.js";
 import { useAnnouncer } from "./useAnnouncer.js";
 import { useGauntletMachine, type GauntletMachine } from "./useGauntletMachine.js";
 import type { RegistryEntry } from "./registry.js";
@@ -71,12 +72,11 @@ export function TournamentRunner({
 
   useAnnouncer({
     phase: machine.phase,
-    manifests: machine.manifests,
-    results: machine.results,
     players,
     registry: machine.registry,
     setlistLength: machine.plan.setlist.length,
     gameIdForRound: machine.gameIdForRound,
+    results: machine.results,
   });
 
   const devStats: DevOverlayStats = (() => {
@@ -113,6 +113,10 @@ export function TournamentRunner({
           : { kind: "custom", label: "Exit", run: onExit }
       }
     >
+      {/* Every tournament phase has the same top-left back/exit control. The BackScope
+          above flips it between Exit (non-gameplay) and Forfeit (gameplay). */}
+      <BackButton label={inGame ? "Forfeit" : "Exit"} />
+
       {machine.registry.length === 0 ? (
         <EmptyRegistryNotice onExit={onExit} />
       ) : (
@@ -150,10 +154,41 @@ function PhaseView({
   now: () => number;
   onExit: () => void;
 }) {
-  const { phase, plan, manifests, registry, results, totals, currentManifest } = machine;
+  const { phase, plan, registry, results, totals, currentManifest } = machine;
 
-  if (phase.kind === "reveal") {
-    return <SetlistReveal manifests={manifests} onDone={() => machine.startRound(0)} />;
+  if (phase.kind === "selector") {
+    const label = phase.suddenDeath
+      ? "Sudden Death"
+      : `Round ${phase.roundIndex + 1} of ${plan.setlist.length}`;
+    const poolManifests = registry.map((r) => r.manifest);
+    // Prefer the seeded target; fall back to the first registered game if anything
+    // went sideways so we never leave the selector mounted with no target.
+    const target = currentManifest ?? poolManifests[0];
+    if (!target) return null;
+    return (
+      <GameSelector
+        target={target}
+        pool={poolManifests}
+        label={label}
+        durationMs={phase.durationMs}
+        onDone={machine.onSelectorDone}
+      />
+    );
+  }
+
+  if (phase.kind === "briefing") {
+    if (!currentManifest) return null;
+    const label = phase.suddenDeath
+      ? "Sudden Death"
+      : `Round ${phase.roundIndex + 1} of ${plan.setlist.length}`;
+    return (
+      <GameBriefing
+        manifest={currentManifest}
+        label={label}
+        autoReadyAfterMs={plan.briefingMinMs}
+        onReady={machine.onBriefingReady}
+      />
+    );
   }
 
   if (phase.kind === "countdown") {
@@ -243,7 +278,7 @@ function EmptyRegistryNotice({ onExit }: { onExit: () => void }) {
           Games get added to the registry in milestones M3 (frootninja) and M4 (ponghub). The
           tournament orchestrator is wired and will run as soon as there's something to play.
         </p>
-        <button className="tournament-button" onClick={onExit}>
+        <button className="tournament-button primary lg" onClick={onExit}>
           Back
         </button>
       </div>
