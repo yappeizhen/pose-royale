@@ -68,7 +68,9 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   const trailCtx = trailCanvas.getContext("2d");
   if (!trailCtx) throw new Error("frootninja: 2D canvas context unavailable for trail");
 
-  // HUD — score / bombs / opponent score.
+  // HUD — comic-pop score / bombs / opponent badges. Styled to match the
+  // design brief: white card, thick black border, solid offset shadow,
+  // gentle rotation, Nunito display font.
   const hud = document.createElement("div");
   hud.style.cssText = [
     "position:absolute",
@@ -78,32 +80,35 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
     "display:flex",
     "justify-content:space-between",
     "align-items:flex-start",
-    "gap:12px",
+    "gap:16px",
     "pointer-events:none",
-    "font-family:var(--font-display, system-ui, sans-serif)",
-    "color:white",
-    "text-shadow:0 2px 8px rgba(0,0,0,0.6)",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "color:var(--color-fg, #2D1F3D)",
     "z-index:3",
   ].join(";");
   el.appendChild(hud);
 
-  const scoreBadge = document.createElement("div");
-  scoreBadge.style.cssText = [
-    "padding:8px 16px",
+  const badgeBase = [
+    "padding:10px 18px",
+    "background:var(--color-card, #fff)",
+    "color:var(--color-fg, #2D1F3D)",
+    "border:4px solid var(--color-border, #000)",
     "border-radius:14px",
-    "background:rgba(0,0,0,0.45)",
-    "backdrop-filter:blur(6px)",
+    "box-shadow:var(--shadow-sm, 4px 4px 0 #000)",
     "font-size:1.5rem",
-    "font-weight:700",
+    "font-weight:900",
     "display:flex",
     "gap:14px",
     "align-items:center",
+    "letter-spacing:0.01em",
   ].join(";");
+
+  const scoreBadge = document.createElement("div");
+  scoreBadge.style.cssText = `${badgeBase};transform:rotate(-2deg)`;
   hud.appendChild(scoreBadge);
 
   const oppBadge = document.createElement("div");
-  oppBadge.style.cssText = scoreBadge.style.cssText;
-  oppBadge.style.opacity = "0.85";
+  oppBadge.style.cssText = `${badgeBase};transform:rotate(2deg);background:var(--color-secondary, #FF7AB8);color:var(--color-secondary-fg, #fff)`;
   hud.appendChild(oppBadge);
 
   // Bomb hit flash overlay.

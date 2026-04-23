@@ -43,40 +43,42 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   canvas.style.touchAction = "none";
   el.appendChild(canvas);
 
-  // Scoreboard overlay (mirrors the original pingpong GameHUD).
+  // Scoreboard — comic-pop styled to match the design brief: white card,
+  // thick black border, solid offset shadow, gentle alternating rotation.
   const hud = document.createElement("div");
   hud.style.position = "absolute";
-  hud.style.top = "16px";
+  hud.style.top = "72px"; // below the orchestrator header
   hud.style.left = "0";
   hud.style.right = "0";
   hud.style.display = "flex";
   hud.style.justifyContent = "center";
   hud.style.gap = "24px";
   hud.style.pointerEvents = "none";
-  hud.style.fontFamily = "system-ui, sans-serif";
-  hud.style.fontWeight = "700";
-  hud.style.color = "#fff";
-  hud.style.textShadow = "0 2px 6px rgba(0,0,0,0.55)";
+  hud.style.fontFamily = "var(--font-display, 'Nunito', system-ui, sans-serif)";
+  hud.style.color = "var(--color-fg, #2D1F3D)";
+  hud.style.zIndex = "3";
+
+  const badgeBase = [
+    "padding:10px 20px",
+    "background:var(--color-card, #fff)",
+    "border:4px solid var(--color-border, #000)",
+    "border-radius:16px",
+    "box-shadow:var(--shadow-sm, 4px 4px 0 #000)",
+    "min-width:120px",
+    "text-align:center",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+  ].join(";");
+
+  const labelStyle = "font-size:12px;font-weight:800;letter-spacing:0.08em;opacity:0.75";
+  const scoreStyle = "font-size:32px;font-weight:900;line-height:1.1;margin-top:2px";
 
   const youBadge = document.createElement("div");
-  youBadge.style.padding = "10px 18px";
-  youBadge.style.borderRadius = "14px";
-  youBadge.style.background = "rgba(8,16,30,0.55)";
-  youBadge.style.backdropFilter = "blur(8px)";
-  youBadge.style.border = "1px solid rgba(255,221,0,0.55)";
-  youBadge.style.minWidth = "120px";
-  youBadge.style.textAlign = "center";
-  youBadge.innerHTML = `<div style="font-size:12px;opacity:0.8">YOU</div><div id="pongHubYouScore" style="font-size:28px">0</div>`;
+  youBadge.style.cssText = `${badgeBase};transform:rotate(-3deg);background:var(--color-tertiary, #FFD93D);color:var(--color-tertiary-fg, #000)`;
+  youBadge.innerHTML = `<div style="${labelStyle}">YOU</div><div id="pongHubYouScore" style="${scoreStyle}">0</div>`;
 
   const aiBadge = document.createElement("div");
-  aiBadge.style.padding = "10px 18px";
-  aiBadge.style.borderRadius = "14px";
-  aiBadge.style.background = "rgba(8,16,30,0.55)";
-  aiBadge.style.backdropFilter = "blur(8px)";
-  aiBadge.style.border = "1px solid rgba(244,67,54,0.55)";
-  aiBadge.style.minWidth = "120px";
-  aiBadge.style.textAlign = "center";
-  aiBadge.innerHTML = `<div style="font-size:12px;opacity:0.8">CPU</div><div id="pongHubAiScore" style="font-size:28px">0</div>`;
+  aiBadge.style.cssText = `${badgeBase};transform:rotate(3deg);background:var(--color-coral, #FF6B6B);color:#fff`;
+  aiBadge.innerHTML = `<div style="${labelStyle}">CPU</div><div id="pongHubAiScore" style="${scoreStyle}">0</div>`;
 
   hud.appendChild(youBadge);
   hud.appendChild(aiBadge);
@@ -85,7 +87,9 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   const youScoreEl = youBadge.querySelector<HTMLDivElement>("#pongHubYouScore")!;
   const aiScoreEl = aiBadge.querySelector<HTMLDivElement>("#pongHubAiScore")!;
 
-  // Center prompt (shown between serves + when acquiring hand).
+  // Center prompt (shown between serves + when acquiring hand). Styled as a
+  // white comic-pop card with thick black border + offset shadow, matching
+  // the rest of the in-game HUD.
   const prompt = document.createElement("div");
   prompt.style.position = "absolute";
   prompt.style.inset = "0";
@@ -93,18 +97,31 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   prompt.style.alignItems = "center";
   prompt.style.justifyContent = "center";
   prompt.style.pointerEvents = "none";
-  prompt.style.color = "#fff";
-  prompt.style.fontFamily = "system-ui, sans-serif";
-  prompt.style.fontWeight = "700";
-  prompt.style.fontSize = "20px";
-  prompt.style.textShadow = "0 2px 8px rgba(0,0,0,0.6)";
   prompt.style.opacity = "0";
-  prompt.style.transition = "opacity 120ms ease-out";
+  prompt.style.transition = "opacity 150ms ease-out";
+  prompt.style.zIndex = "3";
   el.appendChild(prompt);
+
+  const promptInner = document.createElement("div");
+  promptInner.style.cssText = [
+    "background:var(--color-card, #fff)",
+    "color:var(--color-fg, #2D1F3D)",
+    "border:4px solid var(--color-border, #000)",
+    "border-radius:16px",
+    "box-shadow:var(--shadow-md, 6px 6px 0 #000)",
+    "padding:12px 24px",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "font-weight:900",
+    "font-size:20px",
+    "text-transform:uppercase",
+    "letter-spacing:0.04em",
+    "transform:rotate(-2deg)",
+  ].join(";");
+  prompt.appendChild(promptInner);
 
   const setPrompt = (text: string): void => {
     if (text) {
-      prompt.textContent = text;
+      promptInner.textContent = text;
       prompt.style.opacity = "1";
     } else {
       prompt.style.opacity = "0";

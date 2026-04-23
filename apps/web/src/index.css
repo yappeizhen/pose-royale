@@ -1,38 +1,36 @@
 /* ──────────────────────────────────────────────────────────────────────────
    Pose Royale — design tokens + global primitives.
 
-   Everything visual in the app ultimately bottoms out in these tokens. They
-   live on :root so `@pose-royale/ui` components (BackButton, CameraGate,
-   OpponentBubble) can consume them without bundling CSS — CSS custom
-   properties inherit, so any `var(--color-fg)` inside a UI component picks
-   up the app-level theme automatically.
+   The aesthetic is "bold comic pop" (see DESIGN_BRIEF.md):
+     • Soft blue → lavender gradient backdrop with a black halftone overlay.
+     • Thick (4px) black borders + SOLID black offset shadows (no blur).
+     • Subtle per-element rotation (-3° to 3°) for a hand-placed feel.
+     • Nunito for display + buttons (semibold→black), Inter for body.
+     • CTA tiers: primary (purple), secondary (pink), tertiary (yellow).
 
-   Naming conventions:
-     • `--color-…` — semantic color (fg, bg, surface, border, accent).
-     • `--fs-…`    — font sizes, h1/h2/h3/body/sm/xs scale.
-     • `--space-…` — 4px-based spacing ramp (space-1 = 0.25rem, ...).
-     • `--radius-…`— corner ramp (xs/sm/md/lg/pill).
-     • `--shadow-…`— layered shadow scale.
+   All tokens live on :root so `@pose-royale/ui` components (BackButton,
+   CameraGate, OpponentBubble) inherit them without bundling their own CSS.
    ────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* ── Typography ──────────────────────────────────────────────── */
-  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-display: "Nunito", system-ui, -apple-system, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
   --fs-xs: 0.75rem;
   --fs-sm: 0.85rem;
   --fs-body: 1rem;
   --fs-lg: 1.15rem;
+  --fs-h3: clamp(1.25rem, 2.4vw, 1.75rem);
   --fs-h2: clamp(1.5rem, 3vw, 2.25rem);
-  --fs-h1: clamp(2rem, 5vw, 3.5rem);
-  --fs-display: clamp(8rem, 18vw, 16rem);
+  --fs-h1: clamp(2.25rem, 5vw, 3.75rem);
+  --fs-display: clamp(9rem, 20vw, 18rem);
   --tracking-wide: 0.04em;
   --tracking-wider: 0.08em;
 
-  /* ── Spacing ─────────────────────────────────────────────────── */
+  /* ── Spacing (4px base ramp) ─────────────────────────────────── */
   --space-0: 0.25rem;
   --space-1: 0.5rem;
   --space-2: 0.75rem;
@@ -41,65 +39,76 @@
   --space-5: 2rem;
   --space-6: 3rem;
 
-  /* ── Colors ──────────────────────────────────────────────────── */
-  --color-bg: #0a0a15;
-  --color-bg-raised: #12121f;
-  --color-bg-deep: #06060e;
-  --color-surface: rgba(255, 255, 255, 0.04);
-  --color-surface-strong: rgba(255, 255, 255, 0.07);
-  --color-surface-overlay: rgba(0, 0, 0, 0.5);
-  --color-fg: #ffffff;
-  --color-fg-muted: rgba(255, 255, 255, 0.72);
-  --color-fg-subtle: rgba(255, 255, 255, 0.48);
-  --color-fg-faint: rgba(255, 255, 255, 0.32);
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.2);
-  --color-accent: #ff2f6a;
-  --color-accent-soft: rgba(255, 47, 106, 0.14);
-  --color-accent-2: #7dd3fc;
-  --color-accent-2-soft: rgba(125, 211, 252, 0.16);
-  --color-warn: #ffd166;
-  --color-danger: #ff5470;
-  --color-focus-ring: rgba(125, 211, 252, 0.6);
+  /* ── Base colors ─────────────────────────────────────────────── */
+  --color-bg-start: #a8d5f5;
+  --color-bg-end: #d4c5e8;
+  --color-bg-gradient: linear-gradient(135deg, var(--color-bg-start) 0%, var(--color-bg-end) 100%);
+  --color-bg-deep: #6b4fbf;
+
+  --color-fg: #2d1f3d;
+  --color-fg-muted: rgba(45, 31, 61, 0.72);
+  --color-fg-subtle: rgba(45, 31, 61, 0.5);
+  --color-fg-faint: rgba(45, 31, 61, 0.32);
+
+  --color-card: #ffffff;
+  --color-card-translucent: rgba(255, 255, 255, 0.95);
+  --color-surface: rgba(255, 255, 255, 0.85);
+
+  --color-ink: #000000;
+  --color-border: #000000;
+
+  /* ── CTA tiers ───────────────────────────────────────────────── */
+  --color-primary: #6b4fbf;
+  --color-primary-fg: #ffffff;
+  --color-secondary: #ff7ab8;
+  --color-secondary-fg: #ffffff;
+  --color-tertiary: #ffd93d;
+  --color-tertiary-fg: #000000;
+
+  /* ── Accents ─────────────────────────────────────────────────── */
+  --color-coral: #ff6b6b;
+  --color-cobalt: #4a90e2;
+  --color-lime: #8fc670;
+  --color-sunflower: #ffd93d;
+  --color-pink: #ff7ab8;
+  --color-mint: #a8e6cf;
+
+  /* ── Per-game ────────────────────────────────────────────────── */
+  --color-game-frootninja: #ff7ab8;
+  --color-game-frootninja-2: #ffd93d;
+  --color-game-ponghub: #4a90e2;
+  --color-game-ponghub-2: #8fc670;
+
+  /* ── System ──────────────────────────────────────────────────── */
+  --color-success: #5cb85c;
+  --color-warning: #ffc048;
+  --color-danger: #ff6b6b;
+
+  /* ── Borders ─────────────────────────────────────────────────── */
+  --border-thin: 2px solid var(--color-border);
+  --border: 3px solid var(--color-border);
+  --border-thick: 4px solid var(--color-border);
+  --border-chunky: 5px solid var(--color-border);
+
+  /* ── Shadows — solid black, no blur (comic-pop offset) ───────── */
+  --shadow-xs: 2px 2px 0 var(--color-border);
+  --shadow-sm: 4px 4px 0 var(--color-border);
+  --shadow-md: 6px 6px 0 var(--color-border);
+  --shadow-lg: 8px 8px 0 var(--color-border);
+  --shadow-xl: 10px 10px 0 var(--color-border);
 
   /* ── Radii ───────────────────────────────────────────────────── */
-  --radius-xs: 8px;
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
+  --radius-sm: 0.75rem;
+  --radius-md: 1.25rem;
+  --radius-lg: 1.75rem;
+  --radius-xl: 2.25rem;
   --radius-pill: 999px;
 
-  /* ── Shadows ─────────────────────────────────────────────────── */
-  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-
-  /* ── Effects ─────────────────────────────────────────────────── */
-  --blur-surface: blur(12px);
-  --blur-overlay: blur(6px);
-
-  /* ── Backdrops ───────────────────────────────────────────────── */
-  --backdrop-radial: radial-gradient(
-    circle at 50% 22%,
-    rgba(255, 47, 106, 0.22) 0%,
-    rgba(125, 211, 252, 0.1) 32%,
-    var(--color-bg) 72%
-  );
-  --backdrop-screen: radial-gradient(
-    circle at 50% 30%,
-    rgba(26, 26, 46, 0.82),
-    rgba(10, 10, 21, 0.92)
-  );
-
-  /* ── Legacy aliases (still referenced by some callsites) ─────── */
-  --bg-0: var(--color-bg);
-  --bg-1: var(--color-bg-raised);
-  --fg-0: var(--color-fg);
-  --fg-1: var(--color-fg-muted);
-  --accent: var(--color-accent);
-  --accent-2: var(--color-accent-2);
+  /* ── Focus ring ──────────────────────────────────────────────── */
+  --color-focus-ring: rgba(107, 79, 191, 0.45);
 
   font-family: var(--font-body);
+  color: var(--color-fg);
 }
 
 *,
@@ -114,7 +123,7 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--color-bg);
+  background: var(--color-bg-gradient);
   color: var(--color-fg);
 }
 
@@ -129,50 +138,40 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   Global utility classes — shared by the app shell and UI package.
-   These intentionally avoid any tournament-specific names so they
-   can be reused across solo/lobby/multiplayer flows without churn.
-   ────────────────────────────────────────────────────────────── */
+   Halftone dot overlay — apply via `.has-halftone` to any positioned
+   element. The 15% opacity + 12px grid matches the design brief.
+   ────────────────────────────────────────────────────────────────── */
+.has-halftone {
+  position: relative;
+}
 
-.app-backdrop {
-  position: fixed;
+.has-halftone::before {
+  content: "";
+  position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: var(--space-5);
-  background: var(--backdrop-radial), var(--color-bg);
-  color: var(--color-fg);
-  text-align: center;
+  background-image: radial-gradient(circle, #000 1px, transparent 1.2px);
+  background-size: 12px 12px;
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.app-backdrop .stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: center;
-  max-width: 480px;
-}
-
-.app-backdrop h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-h2);
-}
-
-.app-backdrop p {
-  margin: 0;
-  color: var(--color-fg-muted);
+.has-halftone > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* ──────────────────────────────────────────────────────────────
    App shell — home screen + webcam background.
    ────────────────────────────────────────────────────────────── */
 
+/* The active-player webcam sits behind gameplay only. It's NOT shown
+   on non-game screens — the comic-pop backdrop is opaque there. */
 .webcam-bg {
   position: fixed;
   inset: 0;
@@ -192,15 +191,55 @@ button {
   align-items: center;
   justify-content: center;
   padding: var(--space-5) var(--space-4);
-  gap: var(--space-2);
+  gap: var(--space-3);
   text-align: center;
-  background: var(--backdrop-radial), var(--color-bg);
+  background: var(--color-bg-gradient);
+}
+
+.app-home__banner {
+  display: inline-block;
+  background: var(--color-card);
+  border: var(--border-chunky);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.85rem 1.75rem;
+  transform: rotate(-2deg);
+  margin-bottom: var(--space-2);
+}
+
+.app-home__banner h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: var(--fs-h1);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+  text-shadow: 4px 4px 0 rgba(0, 0, 0, 0.12);
+}
+
+.app-home__banner--sub {
+  transform: rotate(1deg);
+  padding: 0.45rem 1.1rem;
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-sm);
+  border-width: 4px;
+  background: var(--color-tertiary);
+}
+
+.app-home__banner--sub span {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-lg);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-tertiary-fg);
 }
 
 .app-home__hero {
   position: relative;
-  width: min(90vw, 640px);
-  margin-bottom: var(--space-2);
+  width: min(86vw, 560px);
+  margin: var(--space-2) 0;
 }
 
 .app-home__video {
@@ -208,44 +247,21 @@ button {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--radius-lg);
-  transform: scaleX(-1);
+  transform: scaleX(-1) rotate(-1deg);
   background: var(--color-bg-deep);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-float);
+  border: var(--border-chunky);
+  box-shadow: var(--shadow-lg);
   position: relative;
   z-index: 1;
 }
 
-.app-home__glow {
-  position: absolute;
-  inset: -20% -20% -30%;
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(ellipse at 20% 0%, rgba(255, 47, 106, 0.35), transparent 60%),
-    radial-gradient(ellipse at 80% 100%, rgba(125, 211, 252, 0.3), transparent 60%);
-  filter: blur(40px);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.app-home__title {
-  margin: var(--space-1) 0 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-h1);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-fg) 0%, var(--color-accent-2) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
 .app-home__subtitle {
   margin: 0;
-  color: var(--color-fg-muted);
-  max-width: 480px;
-  font-size: var(--fs-body);
-  line-height: 1.5;
+  color: var(--color-fg);
+  max-width: 520px;
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .app-home__cta {
@@ -253,23 +269,114 @@ button {
 }
 
 .app-home__hint {
-  color: var(--color-fg-faint);
+  color: var(--color-fg-subtle);
   font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Context-aware back button (UI package). Mirrors .tournament-button.tertiary.sm
+   but is declared here so @pose-royale/ui doesn't need to import tournament CSS. */
+.back-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.45rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 3px solid var(--color-border);
+  background: var(--color-tertiary);
+  color: var(--color-tertiary-fg);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transform: rotate(-2deg);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.back-button:hover:not(:disabled) {
+  transform: rotate(-2deg) translate(-1px, -1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.back-button:active:not(:disabled) {
+  transform: rotate(-2deg) translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--color-border);
 }
 
 .app-home__hint kbd {
   padding: 1px 6px;
-  border-radius: var(--radius-xs);
-  background: var(--color-surface-strong);
-  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Keyframes — scoped global so `@pose-royale/ui` components can
+   Backdrop notices (camera gate, center notices, empty registry).
+   ────────────────────────────────────────────────────────────── */
+
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: var(--color-bg-gradient);
+  color: var(--color-fg);
+  text-align: center;
+  overflow: hidden;
+}
+
+.app-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, #000 1px, transparent 1.2px);
+  background-size: 12px 12px;
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-backdrop > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-backdrop .stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+  max-width: 480px;
+}
+
+.app-backdrop h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-h2);
+  color: var(--color-fg);
+}
+
+.app-backdrop p {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Keyframes — shared globally so `@pose-royale/ui` components can
    reference them without bundling their own CSS.
    ────────────────────────────────────────────────────────────── */
 
@@ -286,10 +393,24 @@ button {
 @keyframes pose-fade-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pose-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
   }
 }

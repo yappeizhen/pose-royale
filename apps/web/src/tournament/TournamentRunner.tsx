@@ -303,7 +303,7 @@ function PlayingPhase({
   if (!module) {
     return (
       <div className="tournament-screen">
-        <span className="tournament-pill">Loading {entry.manifest.name}…</span>
+        <span className="tournament-pill primary">Loading {entry.manifest.name}…</span>
       </div>
     );
   }

@@ -32,7 +32,7 @@ export function FinalScreen({
     try {
       await shareCard(cardRef.current, {
         filename: "pose-royale-result.png",
-        backgroundColor: "#0b1026",
+        backgroundColor: "#ffffff",
       });
     } catch (err) {
       setShareError(err instanceof Error ? err.message : "Share failed");
@@ -41,54 +41,82 @@ export function FinalScreen({
     }
   }
 
+  const winnerName =
+    leader.kind === "winner"
+      ? (players.find((p) => p.id === leader.playerId)?.name ?? "Player")
+      : null;
+
   return (
     <div className="tournament-screen">
       <div className="tournament-stack" style={{ gap: "var(--space-4)", width: "100%" }}>
         <div
           ref={cardRef}
-          className="tournament-card gradient"
-          style={{ width: "min(520px, 100%)" }}
+          className="tournament-card gradient tilt-none"
+          style={{ width: "min(560px, 100%)", alignItems: "center", textAlign: "center" }}
         >
-          <span className="tournament-pill">
+          <span className="tournament-pill accent">
             {suddenDeathResolved ? "Sudden death resolved" : "Final score"}
           </span>
 
-          {leader.kind === "winner" ? (
-            <h1 className="tournament-title accent">
-              {players.find((p) => p.id === leader.playerId)?.name ?? "Player"} wins!
-            </h1>
+          {winnerName ? (
+            <>
+              <div aria-hidden style={{ fontSize: "3.5rem", lineHeight: 1 }}>
+                🏆
+              </div>
+              <div className="tournament-banner">
+                <h1 className="tournament-title">{winnerName.toUpperCase()} WINS!</h1>
+              </div>
+            </>
           ) : (
-            <h1 className="tournament-title">It's a tie</h1>
+            <div className="tournament-banner">
+              <h1 className="tournament-title">IT'S A TIE!</h1>
+            </div>
           )}
 
-          <div className="tournament-scoreboard">
-            {players.map((p) => (
-              <div key={p.id} className="row" style={{ borderLeft: `6px solid ${p.color}` }}>
-                <strong>{p.name}</strong>
-                <span />
-                <span className="total final">{cumulative[p.id] ?? 0}</span>
-              </div>
-            ))}
+          <div className="tournament-scoreboard" style={{ marginTop: "var(--space-2)" }}>
+            {players.map((p) => {
+              const isWinner =
+                leader.kind === "winner" && leader.playerId === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className="row"
+                  style={{
+                    borderLeft: `8px solid ${p.color}`,
+                    background: isWinner ? "#fff9d6" : undefined,
+                  }}
+                >
+                  <strong>{p.name}</strong>
+                  <span />
+                  <span>{isWinner ? "🏆" : ""}</span>
+                  <span className="total final">{cumulative[p.id] ?? 0}</span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="tournament-meta" style={{ marginTop: "var(--space-2)" }}>
-            pose-royale · gauntlet
+            pose royale · gauntlet
           </div>
         </div>
 
         <div className="tournament-hstack">
-          <button className="tournament-button accent" onClick={onRematch}>
-            Rematch
+          <button className="tournament-button primary lg" onClick={onRematch}>
+            🔄 Rematch
           </button>
-          <button className="tournament-button ghost" onClick={onShare} disabled={sharing}>
-            {sharing ? "Preparing…" : "Share MVP"}
+          <button
+            className="tournament-button secondary"
+            onClick={onShare}
+            disabled={sharing}
+          >
+            {sharing ? "📤 Preparing…" : "📤 Share"}
           </button>
-          <button className="tournament-button ghost" onClick={onHome}>
-            Home
+          <button className="tournament-button tertiary" onClick={onHome}>
+            🏠 Home
           </button>
         </div>
         {shareError ? (
-          <p style={{ color: "var(--color-warn)", fontSize: "var(--fs-sm)" }}>
+          <p className="tournament-meta" style={{ color: "var(--color-danger)" }}>
             Couldn't share: {shareError}
           </p>
         ) : null}

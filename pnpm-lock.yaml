@@ -47,9 +47,9 @@ importers:
       '@fontsource/inter':
         specifier: ^5.2.8
         version: 5.2.8
-      '@fontsource/space-grotesk':
-        specifier: ^5.2.10
-        version: 5.2.10
+      '@fontsource/nunito':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@mediapipe/tasks-vision':
         specifier: ^0.10.22-rc.20250304
         version: 0.10.34
@@ -812,8 +812,8 @@ packages:
   '@fontsource/inter@5.2.8':
     resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
 
-  '@fontsource/space-grotesk@5.2.10':
-    resolution: {integrity: sha512-XNXEbT74OIITPqw2H6HXwPDp85fy43uxfBwFR5PU+9sLnjuLj12KlhVM9nZVN6q6dlKjkuN8JisW/OBxwxgUew==}
+  '@fontsource/nunito@5.2.7':
+    resolution: {integrity: sha512-pmtBq0H9ex9nk+RtJYEJOD9pag393iHETnl/PVKleF4i06cd0ttngK5ZCTgYb5eOqR3Xdlrjtev8m7bmgYprew==}
 
   '@grpc/grpc-js@1.9.15':
     resolution: {integrity: sha512-nqE7Hc0AzI+euzUwDAy0aY5hCp10r734gMGRdU+qOPX0XSceI2ULrcXB5U2xSc5VkWwalCj4M7GzCAygZl2KoQ==}
@@ -2731,7 +2731,7 @@ snapshots:
 
   '@fontsource/inter@5.2.8': {}
 
-  '@fontsource/space-grotesk@5.2.10': {}
+  '@fontsource/nunito@5.2.7': {}
 
   '@grpc/grpc-js@1.9.15':
     dependencies:

@@ -56,9 +56,12 @@ export function OpponentBubble({
         height: size,
         borderRadius: "50%",
         overflow: "hidden",
-        border: `3px solid ${color}`,
-        boxShadow: "var(--shadow-card)",
-        background: "var(--color-surface-overlay)",
+        border: "4px solid var(--color-border, #000)",
+        outline: `4px solid ${color}`,
+        outlineOffset: "-8px",
+        boxShadow: "var(--shadow-md, 6px 6px 0 #000)",
+        background: "var(--color-card, #fff)",
+        transform: "rotate(-2deg)",
         zIndex: 40,
         ...anchorStyle,
       }}
@@ -85,8 +88,10 @@ export function OpponentBubble({
             display: "grid",
             placeItems: "center",
             fontFamily: "var(--font-display, system-ui)",
-            fontSize: size * 0.3,
-            color: "var(--color-fg)",
+            fontWeight: 900,
+            fontSize: size * 0.35,
+            color: color,
+            background: "var(--color-card, #fff)",
             animation: state === "connecting" ? "pose-pulse 1.4s ease-in-out infinite" : "none",
           }}
         >
@@ -102,14 +107,18 @@ export function OpponentBubble({
           bottom: 0,
           padding: "6px 10px",
           background: "linear-gradient(transparent, rgba(0,0,0,0.75))",
-          color: "var(--color-fg)",
+          color: "#fff",
           fontSize: 13,
+          fontFamily: "var(--font-display, system-ui)",
+          fontWeight: 800,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          letterSpacing: "0.02em",
+          textTransform: "uppercase",
         }}
       >
-        <span style={{ fontWeight: 600 }}>{name}</span>
+        <span>{name}</span>
         {score !== null ? (
           <span style={{ fontVariantNumeric: "tabular-nums" }}>{Math.round(score * 1000)}</span>
         ) : null}
@@ -125,9 +134,11 @@ export function OpponentBubble({
             padding: "3px 8px",
             fontSize: 10,
             textAlign: "center",
-            background: "rgba(255,84,112,0.85)",
-            color: "var(--color-fg)",
-            letterSpacing: 0.5,
+            background: "var(--color-danger, #FF6B6B)",
+            color: "#fff",
+            fontFamily: "var(--font-display, system-ui)",
+            fontWeight: 800,
+            letterSpacing: 0.8,
             textTransform: "uppercase",
           }}
         >

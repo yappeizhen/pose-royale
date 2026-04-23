@@ -1,6 +1,7 @@
-/* Tournament-screen primitives — every token here comes from index.css. */
+/* Tournament screen primitives — comic-pop aesthetic.
+   Every color / shadow / radius bottoms out in the tokens in index.css. */
 
-/* ── Screen container (reveal / countdown / interlude / final) ──────── */
+/* ── Screen container ───────────────────────────────────────────────── */
 .tournament-screen {
   position: fixed;
   inset: 0;
@@ -8,22 +9,41 @@
   place-items: center;
   padding: var(--space-4);
   color: var(--color-fg);
-  /* Semi-transparent so the webcam background shows through between rounds. */
-  background: var(--backdrop-screen);
-  animation: pose-fade-in 240ms ease-out;
+  background: var(--color-bg-gradient);
+  /* Halftone overlay (matches `.has-halftone`, inlined so the entire
+     screen can still be a grid with `place-items: center`). */
+  overflow: hidden;
+  animation: pose-fade-in 220ms ease-out;
 }
 
+.tournament-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, #000 1px, transparent 1.2px);
+  background-size: 12px 12px;
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tournament-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Layout helpers ─────────────────────────────────────────────────── */
 .tournament-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   align-items: center;
   text-align: center;
 }
 
 .tournament-hstack {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
@@ -33,107 +53,199 @@
 .tournament-title {
   font-family: var(--font-display);
   font-size: var(--fs-h1);
-  font-weight: 700;
+  font-weight: 800;
   margin: 0;
-  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--color-fg);
+  letter-spacing: -0.005em;
+  text-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
 }
 
 .tournament-title.accent {
-  color: var(--color-accent-2);
+  color: var(--color-primary);
 }
 
-.tournament-countdown-digit {
+.tournament-subtitle {
   font-family: var(--font-display);
-  font-size: var(--fs-display);
+  font-size: var(--fs-h3);
   font-weight: 700;
-  line-height: 1;
-  animation: tournament-pop 700ms ease-out;
-  text-shadow: 0 12px 48px rgba(255, 47, 106, 0.25);
+  margin: 0;
+  color: var(--color-fg);
 }
 
+.tournament-meta {
+  color: var(--color-fg-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+/* Big rotated white banner used for hero titles. */
+.tournament-banner {
+  display: inline-block;
+  background: var(--color-card);
+  border: var(--border-chunky);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.85rem 1.75rem;
+  transform: rotate(-2deg);
+}
+
+.tournament-banner .tournament-title {
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.12);
+}
+
+/* Pill — small white rotated badge for labels + kickers. */
 .tournament-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
-  padding: 0.3rem 0.8rem;
+  padding: 0.35rem 0.9rem;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-strong);
+  background: var(--color-card);
+  border: var(--border);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--font-display);
   font-size: var(--fs-sm);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-accent-2);
-  font-weight: 500;
+  color: var(--color-fg);
+  font-weight: 700;
+  transform: rotate(-1deg);
 }
 
-.tournament-meta {
-  color: var(--color-fg-subtle);
-  font-size: var(--fs-sm);
+.tournament-pill.accent {
+  background: var(--color-tertiary);
+  color: var(--color-tertiary-fg);
+}
+
+.tournament-pill.primary {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  transform: rotate(1deg);
+}
+
+/* ── Countdown digit ────────────────────────────────────────────────── */
+.tournament-countdown-digit {
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-fg);
+  text-shadow:
+    6px 6px 0 rgba(0, 0, 0, 0.18),
+    0 0 48px rgba(255, 122, 184, 0.35);
+  animation: pose-pop-in 700ms ease-out;
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────── */
 .tournament-card {
   padding: var(--space-3);
+  border: var(--border-thick);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-inset-hi);
+  background: var(--color-card-translucent);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  transform: rotate(-1deg);
+}
+
+.tournament-card.tilt-right {
+  transform: rotate(1deg);
+}
+
+.tournament-card.tilt-none {
+  transform: none;
 }
 
 .tournament-card h3 {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: 800;
   font-size: var(--fs-lg);
+  color: var(--color-fg);
 }
 
 .tournament-card p {
   margin: 0;
   color: var(--color-fg-muted);
   font-size: var(--fs-sm);
+  line-height: 1.45;
 }
 
 .tournament-card.gradient {
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(180deg, var(--color-accent-2-soft) 0%, var(--color-accent-soft) 100%),
-    var(--color-bg-raised);
-  border: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-float);
-  gap: var(--space-2);
+    linear-gradient(180deg, rgba(255, 217, 61, 0.35) 0%, rgba(255, 122, 184, 0.35) 100%),
+    var(--color-card);
+  box-shadow: var(--shadow-xl);
+  gap: var(--space-3);
 }
 
+/* ── Demo grid (setlist reveal) ─────────────────────────────────────── */
 .tournament-demo-grid {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  width: min(960px, 100%);
+  width: min(1000px, 100%);
 }
 
 .tournament-demo-card {
   padding: var(--space-3);
+  border: var(--border-thick);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-inset-hi);
+  background: var(--color-card-translucent);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   text-align: left;
+  transform: rotate(-1deg);
+}
+
+.tournament-demo-grid > :nth-child(3n + 2) .tournament-demo-card,
+.tournament-demo-grid > :nth-child(3n + 2) {
+  transform: rotate(1deg);
+}
+
+.tournament-demo-grid > :nth-child(3n) .tournament-demo-card,
+.tournament-demo-grid > :nth-child(3n) {
+  transform: rotate(-0.5deg);
+}
+
+.tournament-demo-card .card-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--game-color, var(--color-primary));
+  color: var(--game-color-fg, var(--color-primary-fg));
+  border: var(--border);
+  box-shadow: var(--shadow-xs);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.01em;
+  align-self: flex-start;
+  transform: rotate(-1.5deg);
 }
 
 .tournament-demo-card h3 {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: 800;
   font-size: var(--fs-lg);
+  color: var(--color-fg);
 }
 
 .tournament-demo-card .how-to {
   margin: 0;
   color: var(--color-fg-muted);
   font-size: var(--fs-sm);
+  line-height: 1.45;
 }
 
 .tournament-demo-card .controls {
@@ -141,117 +253,200 @@
   padding: 0;
   margin: 0;
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .tournament-demo-card .controls li {
   font-size: var(--fs-xs);
-  color: var(--color-fg-muted);
-  padding: 0.15rem 0.55rem;
+  color: var(--color-fg);
+  padding: 0.2rem 0.6rem;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-strong);
+  background: var(--color-card);
+  border: var(--border-thin);
+  box-shadow: var(--shadow-xs);
+  font-weight: 600;
+}
+
+/* Per-game accent swap — set on the demo-card host. */
+.game-accent-frootninja {
+  --game-color: var(--color-game-frootninja);
+  --game-color-fg: #ffffff;
+}
+
+.game-accent-ponghub {
+  --game-color: var(--color-game-ponghub);
+  --game-color-fg: #ffffff;
+}
+
+.game-accent-default {
+  --game-color: var(--color-primary);
+  --game-color-fg: var(--color-primary-fg);
 }
 
 /* ── Video surfaces ─────────────────────────────────────────────────── */
 .tournament-video {
   width: 100%;
   aspect-ratio: 16 / 9;
+  border: var(--border);
   border-radius: var(--radius-sm);
   object-fit: cover;
   background: var(--color-bg-deep);
+  box-shadow: var(--shadow-xs);
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────── */
 .tournament-button {
-  padding: 0.8rem 1.6rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: var(--color-fg);
-  color: var(--color-bg);
-  font-weight: 600;
+  --rot: -1deg;
+  padding: 0.7rem 1.5rem;
+  border: var(--border-thick);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-weight: 800;
   font-size: var(--fs-body);
-  font-family: inherit;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  box-shadow: var(--shadow-sm);
+  transform: rotate(var(--rot));
+  transition:
+    transform 120ms cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 120ms ease,
+    filter 120ms ease;
 }
 
 .tournament-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  transform: rotate(var(--rot)) translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
 }
 
 .tournament-button:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  transform: rotate(var(--rot)) translate(2px, 2px);
+  box-shadow: var(--shadow-xs);
 }
 
 .tournament-button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+  filter: saturate(0.6);
+}
+
+.tournament-button.primary {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  --rot: -2deg;
+}
+
+.tournament-button.secondary {
+  background: var(--color-secondary);
+  color: var(--color-secondary-fg);
+  --rot: 2deg;
+}
+
+.tournament-button.tertiary {
+  background: var(--color-tertiary);
+  color: var(--color-tertiary-fg);
+  --rot: 1deg;
 }
 
 .tournament-button.ghost {
-  background: transparent;
+  background: var(--color-card);
   color: var(--color-fg);
-  border-color: var(--color-border-strong);
-  box-shadow: none;
 }
 
-.tournament-button.ghost:hover:not(:disabled) {
-  background: var(--color-surface);
-  border-color: var(--color-fg-muted);
+.tournament-button.lg {
+  padding: 0.95rem 2rem;
+  font-size: var(--fs-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
-.tournament-button.accent {
-  background: linear-gradient(135deg, var(--color-accent) 0%, #ff6b9a 100%);
-  color: var(--color-fg);
-  border-color: rgba(255, 107, 154, 0.55);
-  box-shadow: 0 10px 30px rgba(255, 47, 106, 0.35);
+.tournament-button.lg:hover:not(:disabled) {
+  box-shadow: var(--shadow-lg);
+}
+
+.tournament-button.xl {
+  padding: 1.15rem 2.5rem;
+  font-size: var(--fs-h3);
+  border-radius: var(--radius-lg);
+  border-width: 5px;
+  box-shadow: var(--shadow-lg);
+}
+
+.tournament-button.xl:hover:not(:disabled) {
+  box-shadow: var(--shadow-xl);
+}
+
+.tournament-button.sm {
+  padding: 0.45rem 0.9rem;
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+  border-width: 3px;
+  box-shadow: var(--shadow-xs);
+}
+
+.tournament-button.sm:hover:not(:disabled) {
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Scoreboard ─────────────────────────────────────────────────────── */
 .tournament-scoreboard {
   display: grid;
   gap: var(--space-2);
-  width: min(520px, 100%);
+  width: min(560px, 100%);
 }
 
 .tournament-scoreboard .row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: var(--space-3);
   align-items: center;
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--color-card);
+  border: var(--border-thick);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.tournament-scoreboard .row:nth-child(odd) {
+  transform: rotate(-0.5deg);
+}
+
+.tournament-scoreboard .row:nth-child(even) {
+  transform: rotate(0.5deg);
 }
 
 .tournament-scoreboard .row strong {
   font-family: var(--font-display);
-  font-weight: 600;
+  font-weight: 800;
+  color: var(--color-fg);
 }
 
 .tournament-scoreboard .row .delta {
   text-align: right;
-  color: var(--color-fg-muted);
+  color: var(--color-success);
+  font-family: var(--font-display);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .tournament-scoreboard .row .total {
   text-align: right;
   font-family: var(--font-display);
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-lg);
+  color: var(--color-fg);
+  min-width: 4ch;
 }
 
 .tournament-scoreboard .row .total.final {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
 }
 
-/* ── Stage (the playing-phase host) ─────────────────────────────────── */
+/* ── Stage (in-game overlay) ────────────────────────────────────────── */
 .stage-root {
   position: fixed;
   inset: 0;
@@ -263,35 +458,51 @@
   top: 0;
   left: 0;
   right: 0;
-  padding: 0.5rem 1rem;
+  padding: 14px var(--space-3);
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
-  color: var(--color-fg);
+  align-items: flex-start;
+  gap: var(--space-2);
   z-index: 10;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent);
+  /* Subtle top fade so white badges stay readable on light webcam frames. */
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), transparent 85%);
   pointer-events: none;
 }
 
 .stage-header .title {
+  display: inline-block;
+  background: var(--color-card);
+  color: var(--color-fg);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  box-shadow: var(--shadow-sm);
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-weight: 800;
+  font-size: var(--fs-body);
+  transform: rotate(-1.5deg);
+  letter-spacing: 0.005em;
 }
 
 .stage-header .chips {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 
 .stage-chip {
-  padding: 0.15rem 0.6rem;
+  padding: 0.35rem 0.85rem;
   border-radius: var(--radius-pill);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  background: var(--stage-chip-bg, var(--color-surface-strong));
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  background: var(--stage-chip-bg, var(--color-card));
   color: var(--stage-chip-fg, var(--color-fg));
-  border: 1px solid var(--stage-chip-border, var(--color-border-strong));
+  border: 3px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
+  transform: rotate(1.5deg);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .stage-host {
@@ -306,21 +517,22 @@
   right: 12px;
   z-index: 2000;
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--color-border-strong);
-  background: rgba(0, 0, 0, 0.7);
-  color: var(--color-accent-2);
+  border-radius: var(--radius-sm);
+  border: 3px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-fg);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.45;
   pointer-events: none;
-  backdrop-filter: var(--blur-overlay);
+  box-shadow: var(--shadow-xs);
 }
 
 .dev-overlay__title {
   display: block;
   margin-bottom: 4px;
-  color: var(--color-fg);
+  color: var(--color-primary);
+  font-weight: 800;
 }
 
 .dev-overlay__row {
@@ -338,32 +550,23 @@
   padding: var(--space-5);
   text-align: center;
   color: var(--color-fg);
-  background: var(--color-accent-soft);
+  background: var(--color-card);
+  border: var(--border-thick);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  transform: rotate(-1deg);
+  max-width: 480px;
 }
 
 .crash-notice__title {
   margin: 0;
-  font-weight: 600;
+  font-weight: 800;
   font-family: var(--font-display);
+  color: var(--color-danger);
+  font-size: var(--fs-h3);
 }
 
 .crash-notice__body {
   margin: var(--space-1) 0 0;
   color: var(--color-fg-muted);
-}
-
-/* ── Animations ─────────────────────────────────────────────────────── */
-@keyframes tournament-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
 }

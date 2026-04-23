@@ -61,32 +61,13 @@ export function BackButton({
     return () => window.removeEventListener("keydown", onKey);
   }, [trigger]);
 
+  const classes = className ? `back-button ${className}` : "back-button";
   return (
     <button
       type="button"
-      className={className}
+      className={classes}
       onClick={() => void trigger()}
       aria-label={label}
-      style={{
-        position: "fixed",
-        top: 16,
-        left: 16,
-        zIndex: 1000,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "0.5rem 0.9rem",
-        borderRadius: "var(--radius-pill)",
-        border: "1px solid var(--color-border-strong)",
-        background: "var(--color-surface-overlay)",
-        color: "var(--color-fg)",
-        fontWeight: 500,
-        fontSize: "var(--fs-sm)",
-        fontFamily: "inherit",
-        cursor: "pointer",
-        backdropFilter: "var(--blur-surface)",
-        WebkitBackdropFilter: "var(--blur-surface)",
-      }}
     >
       <span aria-hidden>←</span>
       <span>{label}</span>

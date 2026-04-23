@@ -36,8 +36,8 @@ export function Countdown({ startsAt, durationMs, label, now = Date.now, onCompl
 
   return (
     <div className="tournament-screen" aria-live="polite">
-      <div className="tournament-stack">
-        {label && <span className="tournament-pill">{label}</span>}
+      <div className="tournament-stack" style={{ gap: "var(--space-4)" }}>
+        {label && <span className="tournament-pill primary">{label}</span>}
         <div key={remaining} className="tournament-countdown-digit">
           {remaining <= 0 ? "GO!" : remaining}
         </div>

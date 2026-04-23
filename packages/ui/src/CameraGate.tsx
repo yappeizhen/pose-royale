@@ -119,7 +119,7 @@ export function CameraGate({ children, requestStream = defaultRequest }: CameraG
         </h1>
         {state.status === "denied" && <p>{state.message}</p>}
         {state.status === "denied" && (
-          <button type="button" onClick={request} className="tournament-button accent">
+          <button type="button" onClick={request} className="tournament-button primary lg">
             Try again
           </button>
         )}

@@ -12,6 +12,20 @@ interface Props {
   autoSkipMs?: number;
 }
 
+/** Game id → accent class. Unknown ids fall back to the default primary accent. */
+function gameAccent(id: string): string {
+  if (id === "frootninja") return "game-accent-frootninja";
+  if (id === "ponghub") return "game-accent-ponghub";
+  return "game-accent-default";
+}
+
+/** Game id → emoji. Purely decorative; the manifest icon set stays the source of truth. */
+function gameEmoji(id: string): string {
+  if (id === "frootninja") return "🍉";
+  if (id === "ponghub") return "🏓";
+  return "🎮";
+}
+
 export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: Props) {
   const [remaining, setRemaining] = useState(Math.ceil(autoSkipMs / 1000));
 
@@ -29,9 +43,13 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
 
   return (
     <div className="tournament-screen">
-      <div className="tournament-stack" style={{ width: "100%", gap: "var(--space-3)" }}>
-        <span className="tournament-pill">The Gauntlet · {manifests.length} rounds</span>
-        <h1 className="tournament-title">Your setlist</h1>
+      <div className="tournament-stack" style={{ width: "100%", gap: "var(--space-4)" }}>
+        <span className="tournament-pill accent">
+          The Gauntlet · {manifests.length} rounds
+        </span>
+        <div className="tournament-banner">
+          <h1 className="tournament-title">YOUR SETLIST</h1>
+        </div>
         <div className="tournament-demo-grid">
           {manifests.map((m, i) => (
             <DemoCard key={`${m.id}-${i}`} manifest={m} roundIndex={i} />
@@ -39,7 +57,7 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
         </div>
         <div className="tournament-hstack">
           <span className="tournament-meta">Auto-continues in {remaining}s</span>
-          <button className="tournament-button" onClick={onDone}>
+          <button className="tournament-button tertiary sm" onClick={onDone}>
             Skip
           </button>
         </div>
@@ -50,19 +68,13 @@ export function SetlistReveal({ manifests, onDone, autoSkipMs = DEMO_CARD_MS }: 
 
 function DemoCard({ manifest, roundIndex }: { manifest: GameManifest; roundIndex: number }) {
   return (
-    <article className="tournament-demo-card">
-      <header
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: "var(--space-1)",
-        }}
-      >
-        <h3>
-          Round {roundIndex + 1} · {manifest.name}
-        </h3>
-      </header>
+    <article className={`tournament-demo-card ${gameAccent(manifest.id)}`}>
+      <div className="card-header">
+        <span>
+          {gameEmoji(manifest.id)} Round {roundIndex + 1}
+        </span>
+      </div>
+      <h3>{manifest.name}</h3>
       <video
         src={manifest.demo.previewUrl}
         muted

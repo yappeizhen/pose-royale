@@ -140,7 +140,13 @@ function Home({ stream, onStart }: { stream: MediaStream; onStart: () => void })
   }, [stream]);
 
   return (
-    <main className="app-home">
+    <main className="app-home has-halftone">
+      <div className="app-home__banner">
+        <h1>POSE ROYALE</h1>
+      </div>
+      <div className="app-home__banner app-home__banner--sub">
+        <span>Party Tournament!</span>
+      </div>
       <div className="app-home__hero">
         <video
           ref={videoRef}
@@ -149,15 +155,15 @@ function Home({ stream, onStart }: { stream: MediaStream; onStart: () => void })
           autoPlay
           className="app-home__video"
         />
-        <div className="app-home__glow" aria-hidden />
       </div>
-      <span className="tournament-pill">Gauntlet · 3 rounds · 30s each</span>
-      <h1 className="app-home__title">Pose Royale</h1>
       <p className="app-home__subtitle">
-        Three CV-powered minigames in a row. Your webcam is the controller.
+        Three CV-powered minigames · 30 seconds each · your webcam is the controller
       </p>
-      <button onClick={onStart} className="tournament-button accent app-home__cta">
-        Start Gauntlet (Solo)
+      <button
+        onClick={onStart}
+        className="tournament-button primary xl app-home__cta"
+      >
+        🎮 Solo Battle!
       </button>
       <small className="app-home__hint">
         dev · press <kbd>~</kbd> during play for the debug overlay
