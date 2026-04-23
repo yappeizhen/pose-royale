@@ -40,6 +40,12 @@ export interface PaddleState {
   brush?: Vector2;
   /** Clamped 0..1 burst of energy from the swing. */
   swingEnergy?: number;
+  /**
+   * In-plane roll angle of the hand, in radians. 0 = neutral (fingers up, handle down).
+   * Positive rotates the bat counter-clockwise in screen space. Computed from the
+   * wrist → middle-MCP vector and smoothed over frames.
+   */
+  handRoll?: number;
 }
 
 export interface PointEvent {

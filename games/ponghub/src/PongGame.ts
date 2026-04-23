@@ -380,6 +380,12 @@ export class PongGame {
         ? TABLE.LENGTH / 2 + 0.15
         : -TABLE.LENGTH / 2 - 0.15;
     group.position.set(x, y, z);
+    // Euler order is XYZ (default) → intrinsic Z rotates first in the paddle's local
+    // frame (rolls the handle around the face's normal), then the X tilt leans the
+    // whole bat toward/away from the camera. So handRoll rotates the head-vs-handle
+    // axis in screen-plane before we apply the forward/back lean.
+    const roll = paddle.handRoll ?? 0;
+    group.rotation.z = roll;
     group.rotation.x = player === "player1" ? -Math.PI / 6 : Math.PI / 6;
 
     const opacity = paddle.isActive

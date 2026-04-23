@@ -22,6 +22,9 @@ const MIN_TRACKING_CONFIDENCE = 0.35;
 const SWIPE_HISTORY_SIZE = 6;
 const MIN_SWIPE_SPEED = 0.025;
 const SWIPE_SMOOTHING = 0.4;
+// EMA factor for the bat's roll angle. Small enough to damp landmark jitter, large
+// enough that the paddle feels attached to the wrist instead of lagging behind it.
+const ROLL_SMOOTHING = 0.35;
 
 type TrackingPhase = "acquiring" | "tracking";
 
@@ -171,6 +174,24 @@ class SwipeDetector {
   }
 }
 
+/**
+ * Derive the hand's in-plane orientation from the wrist → middle-MCP vector.
+ *
+ * Returns a radian angle measured CCW from the neutral "fingers up, wrist down" pose,
+ * in the mirrored display's coordinate frame — so rotating the hand on camera rotates
+ * the paddle in screen the same way. The webcam is shown mirrored (x → 1 - x), so both
+ * components of the finger-direction vector are taken in landmark space and then
+ * re-projected: display-right is +world-x (flipped from image-x), and display-up is
+ * +world-y (flipped from image-y, which grows downward).
+ */
+function computeHandRoll(hand: TrackedHand): number {
+  if (hand.landmarks.length < 21) return 0;
+  const wrist = hand.landmarks[0]!;
+  const middleMcp = hand.landmarks[9]!;
+  // atan2(sin θ, cos θ) where target world-up = (mx - wx, wy - my) after mirror + y-flip.
+  return Math.atan2(middleMcp.x - wrist.x, wrist.y - middleMcp.y);
+}
+
 function computeGestureFeatures(
   hand: TrackedHand,
   mirrored: boolean,
@@ -219,6 +240,7 @@ export class HandController {
   private lastTrackingTime = 0;
   private lastPosition = { x: 0.5, y: 0.5 };
   private lastActiveTime = 0;
+  private smoothedRoll = 0;
   private lastSwipe: SwipeState = {
     velocity: { x: 0, y: 0 },
     isSwinging: false,
@@ -234,6 +256,7 @@ export class HandController {
     faceTilt: { x: 0, y: 0 },
     brush: { x: 0, y: 0 },
     swingEnergy: 0,
+    handRoll: 0,
     hand: null,
   };
 
@@ -272,6 +295,9 @@ export class HandController {
           ? (this.currentState.brush ?? { x: 0, y: 0 })
           : { x: 0, y: 0 },
         swingEnergy: inGrace ? (this.currentState.swingEnergy ?? 0) : 0,
+        // Keep the last roll while in grace so the bat doesn't snap back when the hand
+        // briefly drops out of frame mid-rally.
+        handRoll: inGrace ? (this.currentState.handRoll ?? 0) : 0,
         hand: null,
       };
       this.currentState = state;
@@ -328,6 +354,16 @@ export class HandController {
     const swipe = this.swipeDetector.update(hasControl ? palm : null, !hasControl);
     const gesture = computeGestureFeatures(primary, true);
 
+    // Roll — wrist→middle-MCP angle, EMA-smoothed along the short way around the circle
+    // so crossing ±π doesn't cause a full 2π flip of the bat.
+    if (hasControl) {
+      const rawRoll = computeHandRoll(primary);
+      let delta = rawRoll - this.smoothedRoll;
+      while (delta > Math.PI) delta -= 2 * Math.PI;
+      while (delta < -Math.PI) delta += 2 * Math.PI;
+      this.smoothedRoll += delta * ROLL_SMOOTHING;
+    }
+
     const brushX = clamp(
       swipe.velocity.x * 0.95 +
         gesture.brushBias.x * 0.45 +
@@ -363,6 +399,7 @@ export class HandController {
       faceTilt: hasControl ? gesture.faceTilt : { x: 0, y: 0 },
       brush: hasControl ? { x: brushX, y: brushY } : { x: 0, y: 0 },
       swingEnergy: hasControl ? swingEnergy : 0,
+      handRoll: hasControl ? this.smoothedRoll : 0,
       hand: hasControl ? primary.handedness : null,
     };
     this.currentState = state;
