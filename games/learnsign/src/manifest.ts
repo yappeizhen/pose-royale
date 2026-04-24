@@ -24,7 +24,7 @@ export const manifest: GameManifest = {
   scoring: "cumulative",
   par: 12,
   demo: {
-    previewUrl: "/games/learnsign/preview.png",
+    previewUrl: "/games/learnsign/preview.jpg",
     howToPlay:
       "A letter appears — hold the matching ASL handshape in the webcam frame until it locks in, then a new letter appears. Chain as many as you can in 30 seconds.",
     controls: [

@@ -297,9 +297,24 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   // overlay below blocks the playfield until the detector is ready so the
   // round timer doesn't tick on an unloaded model. Heuristic detectors don't
   // implement preload(), so this resolves immediately for them.
+  //
+  // We also expose this promise on the returned GameInstance as `ready`, which
+  // the tournament orchestrator respects to freeze the 30-second round clock
+  // until the detector is warm — players shouldn't lose seconds on the first-
+  // run SSD download.
   let detectorReady = detector.preload === undefined;
   let detectorLoadError: Error | null = null;
   const preloadPromise = detector.preload?.();
+  // Always hand the orchestrator a promise that *resolves* (never rejects),
+  // because game UI has already handled the failure case below via the error
+  // overlay. Rejection would only mean "start the round anyway", which is
+  // exactly what a resolved promise also does — so normalise.
+  const readyForOrchestrator: Promise<void> = preloadPromise
+    ? preloadPromise.then(
+        () => undefined,
+        () => undefined,
+      )
+    : Promise.resolve();
 
   // ── Backend status chip (bottom-left, dev-only) ─────────────────────────────
   // Hidden in prod — the "YOU"/opponent tournament badges live in the same
@@ -651,6 +666,7 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   renderHud();
 
   return {
+    ready: readyForOrchestrator,
     start() {
       rafId = requestAnimationFrame(renderFrame);
     },

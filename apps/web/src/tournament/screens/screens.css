@@ -1135,6 +1135,13 @@
   opacity: 0.8;
 }
 
+/* Shown while a game's `ready` promise is still pending. Dims the clock and
+ * runs a gentle breathing animation so the frozen number doesn't look broken. */
+.stage-clock.is-warming {
+  opacity: 0.55;
+  animation: stage-clock-warming 1400ms ease-in-out infinite alternate;
+}
+
 @keyframes stage-clock-pulse {
   from {
     transform: translateX(-50%) rotate(-1.5deg) scale(1);
@@ -1144,8 +1151,18 @@
   }
 }
 
+@keyframes stage-clock-warming {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .stage-clock.is-warning {
+  .stage-clock.is-warning,
+  .stage-clock.is-warming {
     animation: none;
   }
 }

@@ -214,6 +214,18 @@ export interface GameInstance {
    * remove all window/document listeners, and dispose WebGL contexts. Enforced by CI leak test.
    */
   destroy(): void;
+  /**
+   * Optional readiness gate. If present, the orchestrator will:
+   *   1. Delay calling `start()` until this promise settles.
+   *   2. Hold the round deadline in place — the clock freezes at the full
+   *      round duration until the promise resolves, then begins ticking.
+   * Games that need to download models, allocate WebGL contexts, or otherwise
+   * do async warmup work should expose this so the player doesn't burn round
+   * time on a loading screen. Rejection is treated as "start anyway" — the
+   * game's own UI should surface the error. A ~15 s safety timeout in
+   * `GameStage` prevents a stuck promise from hanging the round forever.
+   */
+  readonly ready?: Promise<void>;
 }
 
 export interface GameModule {
