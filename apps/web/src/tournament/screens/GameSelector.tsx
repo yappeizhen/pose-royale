@@ -29,12 +29,14 @@ interface Props {
 function gameAccent(id: string): string {
   if (id === "frootninja") return "game-accent-frootninja";
   if (id === "ponghub") return "game-accent-ponghub";
+  if (id === "learnsign") return "game-accent-learnsign";
   return "game-accent-default";
 }
 
 function gameEmoji(id: string): string {
   if (id === "frootninja") return "🍉";
   if (id === "ponghub") return "🏓";
+  if (id === "learnsign") return "🤟";
   return "🎮";
 }
 

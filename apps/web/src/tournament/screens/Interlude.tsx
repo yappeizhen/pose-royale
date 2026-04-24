@@ -171,6 +171,7 @@ function tierForPoints(points: number): Tier | null {
 function gameEmoji(id: string): string {
   if (id === "frootninja") return "🍉";
   if (id === "ponghub") return "🏓";
+  if (id === "learnsign") return "🤟";
   return "🎮";
 }
 

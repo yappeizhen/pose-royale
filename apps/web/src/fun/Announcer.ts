@@ -89,13 +89,23 @@ export class Announcer {
   roundStart(name: string, index: number, total: number): void {
     this.say(`Round ${index + 1} of ${total}. ${name}.`);
   }
-  roundWinner(winnerName: string | null): void {
-    if (winnerName) this.say(`${winnerName} takes the round.`);
-    else this.say("Tied round.");
+  roundWinner(winnerName: string | null, isLocal = false): void {
+    if (!winnerName) {
+      this.say("Tied round.");
+      return;
+    }
+    // Second-person "You" needs "take"; third-person proper names need "takes".
+    this.say(isLocal ? `${winnerName} take the round.` : `${winnerName} takes the round.`);
   }
-  finalWinner(winnerName: string | null): void {
-    if (winnerName) this.say(`${winnerName} wins the gauntlet!`, { pitch: 1.25 });
-    else this.say("Dead heat. Sudden death incoming.");
+  finalWinner(winnerName: string | null, isLocal = false): void {
+    if (!winnerName) {
+      this.say("Dead heat. Sudden death incoming.");
+      return;
+    }
+    this.say(
+      isLocal ? `${winnerName} win the gauntlet!` : `${winnerName} wins the gauntlet!`,
+      { pitch: 1.25 },
+    );
   }
   suddenDeath(): void {
     this.say("Sudden death!", { pitch: 1.3, rate: 1.15 });

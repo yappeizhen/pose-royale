@@ -20,6 +20,7 @@
     "@pose-royale/cv": "workspace:*",
     "@pose-royale/firebase": "workspace:*",
     "@pose-royale/game-frootninja": "workspace:*",
+    "@pose-royale/game-learnsign": "workspace:*",
     "@pose-royale/game-ponghub": "workspace:*",
     "@pose-royale/multiplayer": "workspace:*",
     "@pose-royale/sdk": "workspace:*",

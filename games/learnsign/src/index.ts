@@ -1,0 +1,657 @@
+/**
+ * LearnSign GameModule entry point.
+ *
+ * Gameplay: a target ASL letter appears. The player shapes their hand into that
+ * letter in front of the webcam. After holding the correct shape for `HOLD_DURATION_MS`
+ * it locks in, scores +1, and a new target letter appears. Raw score = letters landed
+ * in 30 s; par = 12 → normalizes to 1000 tournament points at plan §1 §score.
+ *
+ * Inspired by ngzhili/LearnSign (https://github.com/ngzhili/LearnSign). Pass 1 ships
+ * with a hand-landmark heuristic covering 6 letters; Pass 2 will swap in the real
+ * TF.js SSD MobileNet v2 model for the full 24-letter set.
+ */
+
+import type {
+  FinalScore,
+  GameContext,
+  GameInstance,
+  GameModule,
+  HandFrame,
+  Landmark,
+  TrackedHand,
+  Unsub,
+} from "@pose-royale/sdk";
+import { PASS_1_LETTERS } from "./letters.js";
+import { HOLD_DURATION_MS, SignDetector } from "./SignDetector.js";
+import { manifest } from "./manifest.js";
+
+/**
+ * Bounding-box visualisation state. Tracked separately from the detector's prediction
+ * so the render loop (rAF) can redraw smoothly even when `handSub` happens to fire at
+ * a slightly slower cadence than the display refresh — last-known box persists until
+ * the next frame tells us otherwise.
+ */
+interface BoxSnapshot {
+  /** 0..1 bounding box in mirrored display coords (already x-flipped). */
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  /** Label to render above the box. Empty string hides the label. */
+  label: string;
+  /** Visual state — drives the box's fill + border color. */
+  state: "idle" | "wrong" | "matching";
+  /** 0..1 hold progress; only meaningful when `state === "matching"`. */
+  progress: number;
+}
+
+function mount(el: HTMLElement, ctx: GameContext): GameInstance {
+  // ── DOM scaffolding ─────────────────────────────────────────────────────────
+  // GameStage mounts games into a `position:absolute; inset:0` host. Only force
+  // `position:relative` if the host is still `static` — clobbering it otherwise
+  // would collapse the host to height:0 (children are absolute).
+  if (getComputedStyle(el).position === "static") {
+    el.style.position = "relative";
+  }
+  el.style.overflow = "hidden";
+  el.style.pointerEvents = "none";
+
+  // ── Bounding-box overlay canvas ─────────────────────────────────────────────
+  // Sits above the webcam, below the HUD/prompt. We draw a comic-pop rectangle
+  // around each detected hand with a label pill above it: "?", "Seeing: V",
+  // "Locking A…" etc. Colour shifts based on state so the user gets live feedback
+  // on what the detector thinks they're signing.
+  const boxCanvas = document.createElement("canvas");
+  boxCanvas.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "width:100%",
+    "height:100%",
+    "pointer-events:none",
+    "z-index:2",
+  ].join(";");
+  el.appendChild(boxCanvas);
+  const boxCtx = boxCanvas.getContext("2d");
+  if (!boxCtx) throw new Error("learnsign: 2D canvas context unavailable");
+
+  // ── Target letter card (pinned to the left side so the webcam centre stays clear) ─
+  // Moved off-centre because the bounding-box overlay is the main visual focus —
+  // the prompt is reference material that stays within peripheral vision. Anchored
+  // at left:24px with translateY(-50%) so it vertically centers regardless of the
+  // host's aspect ratio.
+  const card = document.createElement("div");
+  card.style.cssText = [
+    "position:absolute",
+    "top:50%",
+    "left:calc(24px + env(safe-area-inset-left, 0px))",
+    "transform:translateY(-50%) rotate(-2deg)",
+    "display:flex",
+    "flex-direction:column",
+    "align-items:center",
+    "gap:12px",
+    "padding:20px 28px 22px",
+    "min-width:200px",
+    "max-width:240px",
+    "background:var(--color-card, #fff)",
+    "border:4px solid var(--color-border, #2D1F3D)",
+    "border-radius:18px",
+    "box-shadow:var(--shadow-lg, 8px 8px 0 #2D1F3D)",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "color:var(--color-fg, #2D1F3D)",
+    "z-index:3",
+    "transition:transform 180ms ease-out, background 180ms ease-out",
+    "pointer-events:none",
+  ].join(";");
+  el.appendChild(card);
+
+  // "SIGN THIS →" eyebrow so the card reads as a prompt rather than a score badge.
+  const eyebrow = document.createElement("div");
+  eyebrow.style.cssText = [
+    "font-size:0.75rem",
+    "font-weight:900",
+    "letter-spacing:0.12em",
+    "text-transform:uppercase",
+    "color:var(--color-fg-muted, #5A4B6E)",
+  ].join(";");
+  eyebrow.textContent = "Sign this →";
+  card.appendChild(eyebrow);
+
+  // Big letter glyph — readable from across the room. Scaled down from the old
+  // centred card since we're on the side now.
+  const glyph = document.createElement("div");
+  glyph.style.cssText = [
+    "font-size:clamp(90px, 14vw, 160px)",
+    "line-height:0.85",
+    "font-weight:900",
+    "letter-spacing:-0.04em",
+    "color:var(--color-primary, #7A4AFF)",
+    "text-shadow:4px 4px 0 var(--color-border, #2D1F3D)",
+  ].join(";");
+  card.appendChild(glyph);
+
+  // One-liner hint for how to form the sign.
+  const hint = document.createElement("div");
+  hint.style.cssText = [
+    "font-size:0.95rem",
+    "font-weight:700",
+    "text-align:center",
+    "max-width:18ch",
+    "line-height:1.25",
+    "color:var(--color-fg-muted, #5A4B6E)",
+  ].join(";");
+  card.appendChild(hint);
+
+  // Hold-progress bar underneath the hint. Fills left→right as the user holds the
+  // correct shape; empties instantly if they drop the pose.
+  const progressTrack = document.createElement("div");
+  progressTrack.style.cssText = [
+    "position:relative",
+    "width:180px",
+    "height:12px",
+    "background:rgba(45,31,61,0.12)",
+    "border:2px solid var(--color-border, #2D1F3D)",
+    "border-radius:999px",
+    "overflow:hidden",
+  ].join(";");
+  card.appendChild(progressTrack);
+
+  const progressFill = document.createElement("div");
+  progressFill.style.cssText = [
+    "position:absolute",
+    "top:0",
+    "left:0",
+    "bottom:0",
+    "width:0%",
+    "background:linear-gradient(90deg, var(--color-primary, #7A4AFF), var(--color-secondary, #FF7AB8))",
+    "transition:width 80ms linear, opacity 200ms ease",
+  ].join(";");
+  progressTrack.appendChild(progressFill);
+
+  // Skip button — gives players an escape hatch when the detector misfires on a
+  // sign they're not confident in (or when the heuristic can't reliably pick their
+  // particular hand shape). No score penalty, but a short cooldown stops mashing
+  // from skipping the entire queue instantly and re-enables the button visibly
+  // enough that players don't hammer on a dead button.
+  const skipBtn = document.createElement("button");
+  skipBtn.type = "button";
+  skipBtn.textContent = "⏭ Skip";
+  skipBtn.style.cssText = [
+    "margin-top:4px",
+    "padding:8px 16px",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "font-size:0.9rem",
+    "font-weight:900",
+    "letter-spacing:0.05em",
+    "text-transform:uppercase",
+    "color:var(--color-fg, #2D1F3D)",
+    "background:var(--color-card, #fff)",
+    "border:3px solid var(--color-border, #2D1F3D)",
+    "border-radius:12px",
+    "box-shadow:var(--shadow-sm, 4px 4px 0 #2D1F3D)",
+    "cursor:pointer",
+    // Host has pointer-events:none for the webcam passthrough; opt the button back in.
+    "pointer-events:auto",
+    "transition:transform 120ms ease, box-shadow 120ms ease, opacity 180ms ease",
+  ].join(";");
+  skipBtn.addEventListener("mousedown", () => {
+    skipBtn.style.transform = "translate(2px,2px)";
+    skipBtn.style.boxShadow = "2px 2px 0 var(--color-border, #2D1F3D)";
+  });
+  const resetSkipBtnPress = () => {
+    skipBtn.style.transform = "";
+    skipBtn.style.boxShadow = "var(--shadow-sm, 4px 4px 0 #2D1F3D)";
+  };
+  skipBtn.addEventListener("mouseup", resetSkipBtnPress);
+  skipBtn.addEventListener("mouseleave", resetSkipBtnPress);
+  skipBtn.addEventListener("click", () => {
+    skipCurrent();
+  });
+  card.appendChild(skipBtn);
+
+  // ── HUD (score + opponent badge) ────────────────────────────────────────────
+  const hud = document.createElement("div");
+  hud.style.cssText = [
+    "position:absolute",
+    "top:72px",
+    "left:16px",
+    "right:16px",
+    "display:flex",
+    "justify-content:space-between",
+    "align-items:flex-start",
+    "gap:16px",
+    "pointer-events:none",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "color:var(--color-fg, #2D1F3D)",
+    "z-index:3",
+  ].join(";");
+  el.appendChild(hud);
+
+  const badgeBase = [
+    "padding:10px 18px",
+    "background:var(--color-card, #fff)",
+    "color:var(--color-fg, #2D1F3D)",
+    "border:4px solid var(--color-border, #2D1F3D)",
+    "border-radius:14px",
+    "box-shadow:var(--shadow-sm, 4px 4px 0 #2D1F3D)",
+    "font-size:1.5rem",
+    "font-weight:900",
+    "display:flex",
+    "gap:14px",
+    "align-items:center",
+    "letter-spacing:0.01em",
+  ].join(";");
+
+  const scoreBadge = document.createElement("div");
+  scoreBadge.style.cssText = `${badgeBase};transform:rotate(-2deg)`;
+  hud.appendChild(scoreBadge);
+
+  const oppBadge = document.createElement("div");
+  oppBadge.style.cssText = `${badgeBase};transform:rotate(2deg);background:var(--color-secondary, #FF7AB8);color:var(--color-secondary-fg, #fff)`;
+  hud.appendChild(oppBadge);
+
+  // ── Detector + game state ───────────────────────────────────────────────────
+  const detector = new SignDetector();
+  // Deterministic letter queue — seeded from `ctx.rng` so both peers see the same
+  // sequence. We pre-build a long rotation (shuffled, no consecutive repeats) and
+  // walk through it; each round's RNG is already seeded from the room so peers
+  // don't need any handshake.
+  const letterQueue = buildLetterQueue(ctx.rng);
+  let queueIdx = 0;
+  const nextTarget = () => letterQueue[queueIdx++ % letterQueue.length]!.id;
+  let targetLetter = nextTarget();
+
+  let score = 0;
+  let lastScoreBroadcast = -1;
+
+  // ── Multiplayer plumbing (mirrors frootninja/ponghub) ───────────────────────
+  const remoteId = ctx.players.find((p) => !p.isLocal)?.id;
+  let remoteRaw = 0;
+  const netSubs: Unsub[] = [];
+
+  if (ctx.net && remoteId) {
+    netSubs.push(
+      ctx.net.subscribe<number>(`score_${remoteId}`, (value) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          remoteRaw = value;
+          ctx.emitScore({ playerId: remoteId, raw: remoteRaw });
+        }
+      }),
+    );
+  }
+
+  // ── Canvas sizing (DPR-aware) ───────────────────────────────────────────────
+  function resizeCanvas() {
+    const rect = el.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    boxCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    boxCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  }
+  const ro = new ResizeObserver(resizeCanvas);
+  ro.observe(el);
+  resizeCanvas();
+
+  // Latest snapshots from the prediction pipeline — drawn from the rAF loop so box
+  // rendering runs at display rate rather than hand-tracker rate (typically ~30Hz),
+  // which keeps the overlay from flickering when MP skips a frame.
+  let latestBoxes: BoxSnapshot[] = [];
+
+  // ── Prediction pipeline ─────────────────────────────────────────────────────
+  const handSub = ctx.hands.subscribe((frame: HandFrame) => {
+    const prediction = detector.update(frame);
+
+    // Build the bbox for every tracked hand. The *primary* hand (index 0, highest
+    // score) drives the prediction label; any secondary hand gets a neutral "?"
+    // box so the player still sees that it was detected but isn't the one counted.
+    const boxes: BoxSnapshot[] = [];
+    for (let i = 0; i < frame.hands.length; i++) {
+      const hand = frame.hands[i]!;
+      const rect = computeMirroredBbox(hand);
+      if (!rect) continue;
+      if (i === 0) {
+        const { label, state } = labelFor(prediction.letter, targetLetter);
+        const progress =
+          state === "matching" ? Math.min(1, prediction.heldMs / HOLD_DURATION_MS) : 0;
+        boxes.push({ ...rect, label, state, progress });
+      } else {
+        boxes.push({ ...rect, label: "?", state: "idle", progress: 0 });
+      }
+    }
+    latestBoxes = boxes;
+
+    // Fill bar on the prompt card mirrors the primary hand's hold progress — empty
+    // when the wrong letter is showing so the player sees "no progress, tweak pose".
+    if (prediction.letter === targetLetter) {
+      const pct = Math.min(100, (prediction.heldMs / HOLD_DURATION_MS) * 100);
+      progressFill.style.width = `${pct}%`;
+      progressFill.style.opacity = "1";
+    } else {
+      progressFill.style.width = "0%";
+      progressFill.style.opacity = "0.4";
+    }
+
+    // Lock check: if the hold completed, celebrate and advance.
+    const locked = detector.consumeLock(targetLetter);
+    if (locked) {
+      score += 1;
+      flashCorrect();
+      advanceTarget();
+    }
+  });
+
+  function advanceTarget(): void {
+    targetLetter = nextTarget();
+    renderTarget();
+    progressFill.style.width = "0%";
+    detector.reset();
+  }
+
+  // Skip the current target with a short cooldown so mashing the button doesn't
+  // burn through the whole queue instantly. No score penalty — the heuristic
+  // detector is flaky enough on certain hand shapes (fist vs. closed-ish hand vs.
+  // partial occlusion) that "let me move on" needs to be frictionless.
+  const SKIP_COOLDOWN_MS = 600;
+  let skipReadyAt = 0;
+  function skipCurrent(): void {
+    if (!running || paused) return;
+    const now = performance.now();
+    if (now < skipReadyAt) return;
+    skipReadyAt = now + SKIP_COOLDOWN_MS;
+    // Disabled visual: dim + no pointer events until the cooldown elapses.
+    skipBtn.style.opacity = "0.55";
+    skipBtn.style.pointerEvents = "none";
+    window.setTimeout(() => {
+      skipBtn.style.opacity = "1";
+      skipBtn.style.pointerEvents = "auto";
+    }, SKIP_COOLDOWN_MS);
+    advanceTarget();
+  }
+
+  // Keyboard shortcut — "S" triggers skip. Useful for two-player setups where the
+  // player's hands are busy forming signs and they want to bail with the other hand
+  // on the keyboard. Typed into an input? Let the input handle it (we check
+  // target.tagName).
+  const onKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key !== "s" && ev.key !== "S") return;
+    const target = ev.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+    skipCurrent();
+  };
+  window.addEventListener("keydown", onKeyDown);
+
+  function renderTarget(): void {
+    const spec = PASS_1_LETTERS.find((l) => l.id === targetLetter);
+    glyph.textContent = targetLetter;
+    hint.textContent = spec?.hint ?? "";
+  }
+
+  // Brief green flash + scale pop on the card when a letter locks in. Playful
+  // confirmation without stealing focus from the next target. The transform
+  // preserves the `translateY(-50%)` anchor and `rotate(-2deg)` tilt.
+  function flashCorrect(): void {
+    card.style.transform = "translateY(-50%) rotate(-2deg) scale(1.06)";
+    card.style.background = "var(--color-success, #69d66f)";
+    window.setTimeout(() => {
+      card.style.transform = "translateY(-50%) rotate(-2deg)";
+      card.style.background = "var(--color-card, #fff)";
+    }, 240);
+  }
+
+  function renderHud(): void {
+    scoreBadge.textContent = `🤟 ${score}`;
+    if (remoteId) {
+      oppBadge.textContent = `OPP ${remoteRaw}`;
+      oppBadge.style.display = "";
+    } else {
+      oppBadge.style.display = "none";
+    }
+  }
+
+  // ── Render / broadcast loop ─────────────────────────────────────────────────
+  let running = true;
+  let paused = false;
+  let rafId = 0;
+
+  function renderFrame() {
+    if (!running) return;
+    rafId = requestAnimationFrame(renderFrame);
+    if (paused) return;
+    renderHud();
+    drawBoxes();
+    if (score !== lastScoreBroadcast) {
+      ctx.emitScore({ playerId: ctx.localPlayerId, raw: score });
+      if (ctx.net) void ctx.net.set(`score_${ctx.localPlayerId}`, score);
+      lastScoreBroadcast = score;
+    }
+  }
+
+  function drawBoxes(): void {
+    const canvas = boxCanvas;
+    const ctx2d = boxCtx!;
+    ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+    if (latestBoxes.length === 0) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (const box of latestBoxes) {
+      drawBox(ctx2d, canvas.width, canvas.height, dpr, box);
+    }
+  }
+
+  const roundEndUnsub = ctx.onRoundEnd((final: FinalScore) => {
+    void final;
+  });
+
+  renderTarget();
+  renderHud();
+
+  return {
+    start() {
+      rafId = requestAnimationFrame(renderFrame);
+    },
+    pause() {
+      paused = true;
+    },
+    resume() {
+      paused = false;
+    },
+    destroy() {
+      running = false;
+      cancelAnimationFrame(rafId);
+      handSub();
+      roundEndUnsub();
+      for (const u of netSubs) u();
+      ro.disconnect();
+      window.removeEventListener("keydown", onKeyDown);
+      detector.reset();
+      while (el.firstChild) el.removeChild(el.firstChild);
+    },
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Bounding-box helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Derive a normalised 0..1 bounding box from the 21 hand landmarks. Already flipped
+ * into mirrored display coordinates (x → 1 - x) since the webcam background is
+ * rendered mirrored and that's what the user sees.
+ */
+function computeMirroredBbox(
+  hand: TrackedHand,
+): Pick<BoxSnapshot, "left" | "top" | "right" | "bottom"> | null {
+  if (hand.landmarks.length < 21) return null;
+  let minX = 1;
+  let minY = 1;
+  let maxX = 0;
+  let maxY = 0;
+  for (const lm of hand.landmarks as Landmark[]) {
+    if (lm.x < minX) minX = lm.x;
+    if (lm.y < minY) minY = lm.y;
+    if (lm.x > maxX) maxX = lm.x;
+    if (lm.y > maxY) maxY = lm.y;
+  }
+  // 6% horizontal and 8% vertical padding so the box doesn't kiss the fingertips.
+  const padX = 0.06;
+  const padY = 0.08;
+  const paddedMinX = Math.max(0, minX - padX);
+  const paddedMaxX = Math.min(1, maxX + padX);
+  const paddedMinY = Math.max(0, minY - padY);
+  const paddedMaxY = Math.min(1, maxY + padY);
+  // Mirror: the right side of the raw frame (larger x) ends up on the left of the
+  // mirrored display. So display.left comes from (1 - raw.right).
+  return {
+    left: 1 - paddedMaxX,
+    top: paddedMinY,
+    right: 1 - paddedMinX,
+    bottom: paddedMaxY,
+  };
+}
+
+function labelFor(
+  detected: string | null,
+  target: string,
+): { label: string; state: "idle" | "wrong" | "matching" } {
+  if (detected === null) return { label: "?", state: "idle" };
+  if (detected === target) return { label: `${detected} ✓`, state: "matching" };
+  return { label: detected, state: "wrong" };
+}
+
+/**
+ * Comic-pop box: thick black border, tinted fill (transparent idle, amber wrong,
+ * green matching), label pill above. When the state is "matching" we also paint a
+ * progress stroke along the top edge so players can see the lock-in timer filling.
+ */
+function drawBox(
+  ctx2d: CanvasRenderingContext2D,
+  canvasW: number,
+  canvasH: number,
+  dpr: number,
+  box: BoxSnapshot,
+): void {
+  const x = box.left * canvasW;
+  const y = box.top * canvasH;
+  const w = (box.right - box.left) * canvasW;
+  const h = (box.bottom - box.top) * canvasH;
+
+  const borderWidth = 5 * dpr;
+  const radius = 16 * dpr;
+
+  const [fill, border] = colorsFor(box.state);
+
+  ctx2d.save();
+  ctx2d.fillStyle = fill;
+  ctx2d.strokeStyle = border;
+  ctx2d.lineWidth = borderWidth;
+  ctx2d.lineJoin = "round";
+  roundedRectPath(ctx2d, x, y, w, h, radius);
+  ctx2d.fill();
+  ctx2d.stroke();
+  ctx2d.restore();
+
+  // Progress stroke (matching state only) — draws along the top edge, left-to-right.
+  if (box.state === "matching" && box.progress > 0) {
+    ctx2d.save();
+    ctx2d.strokeStyle = "#2D1F3D";
+    ctx2d.lineCap = "round";
+    ctx2d.lineWidth = 6 * dpr;
+    const inset = radius + 2 * dpr;
+    const usableW = Math.max(0, w - inset * 2);
+    ctx2d.beginPath();
+    ctx2d.moveTo(x + inset, y - 6 * dpr);
+    ctx2d.lineTo(x + inset + usableW * box.progress, y - 6 * dpr);
+    ctx2d.stroke();
+    ctx2d.restore();
+  }
+
+  // Label pill above the box. Uses the system display font for consistency with
+  // the rest of the comic-pop UI. Caps the label with a light padding so it never
+  // dips below the box.
+  if (box.label) {
+    const fontPx = Math.max(18, Math.min(28, h * 0.16)) * dpr;
+    ctx2d.save();
+    ctx2d.font = `900 ${fontPx}px "Nunito", system-ui, sans-serif`;
+    ctx2d.textBaseline = "alphabetic";
+    const metrics = ctx2d.measureText(box.label);
+    const padX = 14 * dpr;
+    const padY = 8 * dpr;
+    const pillW = metrics.width + padX * 2;
+    const pillH = fontPx + padY * 2;
+    const pillX = x;
+    const pillY = Math.max(4 * dpr, y - pillH - 14 * dpr);
+    ctx2d.fillStyle = "#ffffff";
+    ctx2d.strokeStyle = "#2D1F3D";
+    ctx2d.lineWidth = 4 * dpr;
+    roundedRectPath(ctx2d, pillX, pillY, pillW, pillH, 12 * dpr);
+    ctx2d.fill();
+    ctx2d.stroke();
+    ctx2d.fillStyle = "#2D1F3D";
+    ctx2d.fillText(box.label, pillX + padX, pillY + pillH - padY - fontPx * 0.1);
+    ctx2d.restore();
+  }
+}
+
+function colorsFor(state: BoxSnapshot["state"]): readonly [string, string] {
+  // [fill, border] — fills are mostly-transparent so the webcam + hand stay visible.
+  switch (state) {
+    case "matching":
+      return ["rgba(105, 214, 111, 0.28)", "#2D1F3D"];
+    case "wrong":
+      return ["rgba(255, 217, 61, 0.28)", "#2D1F3D"];
+    case "idle":
+    default:
+      return ["rgba(255, 255, 255, 0.18)", "#2D1F3D"];
+  }
+}
+
+function roundedRectPath(
+  ctx2d: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx2d.beginPath();
+  ctx2d.moveTo(x + rr, y);
+  ctx2d.lineTo(x + w - rr, y);
+  ctx2d.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx2d.lineTo(x + w, y + h - rr);
+  ctx2d.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx2d.lineTo(x + rr, y + h);
+  ctx2d.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx2d.lineTo(x, y + rr);
+  ctx2d.quadraticCurveTo(x, y, x + rr, y);
+  ctx2d.closePath();
+}
+
+/**
+ * Build a shuffled rotation of the Pass-1 letter set, avoiding consecutive repeats.
+ * Long enough (~6x the set) to exhaust even fast players within one round without
+ * running off the end.
+ */
+function buildLetterQueue(rng: () => number) {
+  const reps = 6;
+  const out: (typeof PASS_1_LETTERS)[number][] = [];
+  for (let i = 0; i < reps; i++) {
+    const shuffled = [...PASS_1_LETTERS];
+    // Fisher-Yates with the provided RNG (so peers agree when seeded identically).
+    for (let j = shuffled.length - 1; j > 0; j--) {
+      const k = Math.floor(rng() * (j + 1));
+      [shuffled[j], shuffled[k]] = [shuffled[k]!, shuffled[j]!];
+    }
+    // Avoid repeats across chunk boundaries.
+    if (out.length > 0 && shuffled[0]!.id === out[out.length - 1]!.id && shuffled.length > 1) {
+      [shuffled[0], shuffled[1]] = [shuffled[1]!, shuffled[0]!];
+    }
+    out.push(...shuffled);
+  }
+  return out;
+}
+
+const learnSignModule: GameModule = {
+  manifest,
+  mount,
+};
+
+export default learnSignModule;
+export { manifest, learnSignModule as module };

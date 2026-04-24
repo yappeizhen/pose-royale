@@ -706,6 +706,11 @@
   --game-color-fg: #ffffff;
 }
 
+.game-accent-learnsign {
+  --game-color: var(--color-game-learnsign);
+  --game-color-fg: #ffffff;
+}
+
 .game-accent-default {
   --game-color: var(--color-primary);
   --game-color-fg: var(--color-primary-fg);

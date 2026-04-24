@@ -61,16 +61,16 @@ export function useAnnouncer({
           }
         }
         const tied = Object.values(r.points).filter((p) => p === topPts).length > 1;
-        const name = tied ? null : (players.find((p) => p.id === topId)?.name ?? null);
-        a.roundWinner(name);
+        const winner = tied ? null : (players.find((p) => p.id === topId) ?? null);
+        a.roundWinner(winner?.name ?? null, winner?.isLocal ?? false);
       }
     } else if (phase.kind === "final") {
       const lead = leaderOf(results);
-      a.finalWinner(
+      const winner =
         lead.kind === "winner"
-          ? (players.find((p) => p.id === lead.playerId)?.name ?? "Player")
-          : null,
-      );
+          ? (players.find((p) => p.id === lead.playerId) ?? null)
+          : null;
+      a.finalWinner(winner?.name ?? (lead.kind === "winner" ? "Player" : null), winner?.isLocal ?? false);
     }
   }, [phase, registry, results, players, setlistLength, gameIdForRound]);
 

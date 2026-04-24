@@ -41,10 +41,19 @@ export function FinalScreen({
     }
   }
 
-  const winnerName =
+  const winnerPlayer =
     leader.kind === "winner"
-      ? (players.find((p) => p.id === leader.playerId)?.name ?? "Player")
+      ? (players.find((p) => p.id === leader.playerId) ?? null)
       : null;
+  const winnerName = winnerPlayer?.name ?? null;
+  // Conjugate "wins" vs "win" based on grammatical person. In solo mode the local
+  // player's name is "You" (second person), which needs "WIN" — "YOU WINS" reads
+  // like a Mario cartridge misprint. Any other proper name gets third-person "WINS".
+  const winHeadline = winnerPlayer
+    ? winnerPlayer.isLocal
+      ? `${winnerName?.toUpperCase()} WIN!`
+      : `${winnerName?.toUpperCase()} WINS!`
+    : null;
 
   return (
     <div className="tournament-screen">
@@ -58,13 +67,13 @@ export function FinalScreen({
             {suddenDeathResolved ? "Sudden death resolved" : "Final score"}
           </span>
 
-          {winnerName ? (
+          {winHeadline ? (
             <>
               <div aria-hidden style={{ fontSize: "3.5rem", lineHeight: 1 }}>
                 🏆
               </div>
               <div className="tournament-banner">
-                <h1 className="tournament-title">{winnerName.toUpperCase()} WINS!</h1>
+                <h1 className="tournament-title">{winHeadline}</h1>
               </div>
             </>
           ) : (

@@ -10,6 +10,7 @@
 
 import type { GameManifest, GameModule } from "@pose-royale/sdk";
 import { manifest as frootninjaManifest } from "@pose-royale/game-frootninja";
+import { manifest as learnsignManifest } from "@pose-royale/game-learnsign";
 import { manifest as ponghubManifest } from "@pose-royale/game-ponghub";
 
 export interface RegistryEntry {
@@ -34,6 +35,11 @@ export const REGISTRY: readonly RegistryEntry[] = [
     id: ponghubManifest.id,
     manifest: ponghubManifest,
     load: () => import("@pose-royale/game-ponghub"),
+  },
+  {
+    id: learnsignManifest.id,
+    manifest: learnsignManifest,
+    load: () => import("@pose-royale/game-learnsign"),
   },
 ] as const;
 
