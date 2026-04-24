@@ -321,16 +321,19 @@
   }
 }
 
-/* ── Selector drumroll (🥁 + animated sticks) ───────────────────────── */
+/* ── Selector drumroll (🥁 + floating music notes) ──────────────────── */
 /* Renders above the reel only while `phase === "spinning"`. Everything is decorative and
- * aria-hidden; the spinning banner handles a11y. Sticks are CSS rectangles with a bulb tip
- * and beat in a staggered rhythm; the drum emoji shakes vigorously underneath. */
+ * aria-hidden; the spinning banner handles a11y. The drum shakes vigorously while four
+ * music notes drift up and fade on staggered cycles, reading as "the drum is being played"
+ * without resorting to fiddly drumstick anatomy. */
 .selector-drumroll {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  padding: 0.25rem 0.3rem 0.75rem;
+  min-width: 220px;
+  min-height: 120px;
+  padding: 0.25rem 0.3rem 0.5rem;
   line-height: 1;
   transform: rotate(-1.5deg);
 }
@@ -339,86 +342,120 @@
   display: inline-block;
   font-size: 3.6rem;
   filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22));
-  animation: selector-drumroll-shake 110ms linear infinite;
+  /* Gentle, slightly slower wobble. Previously ran at 110ms/linear with ±2px/±3deg
+   * which read as an earthquake; 220ms/ease-in-out with ±1px/±1.5deg still reads as
+   * "being played" without making the user feel like they need to hold their glasses. */
+  animation: selector-drumroll-shake 220ms ease-in-out infinite;
   transform-origin: center;
+  z-index: 1;
 }
 
-.selector-drumroll__stick {
-  position: relative;
-  display: inline-block;
-  width: 9px;
-  height: 52px;
-  /* Warm wood gradient. Darker at the tip (bottom) so the bulb attached via ::after reads
-   * as a natural continuation of the shaft. */
-  background: linear-gradient(to bottom, #edc9a3 0%, #a0683a 100%);
-  border: 2px solid var(--color-fg);
-  border-radius: 4px;
-  /* Pivot at the top so the "hand" stays put and only the tip sweeps — matches a real
-   * drummer's wrist flick. */
-  transform-origin: top center;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.22);
-}
-
-.selector-drumroll__stick::after {
-  /* Drumstick tip / ball. Slightly darker than the shaft's darkest point to suggest a
-   * solid wooden head rather than a painted rim. */
-  content: "";
+/* Music notes orbit the drum. Each is absolutely positioned at a start coordinate
+ * relative to the drum's wrapper, then animated to float up + fade. Varying sizes,
+ * colours and delays create an organic "a drum beat is escaping" vibe. */
+.selector-drumroll__note {
   position: absolute;
+  top: 50%;
   left: 50%;
-  bottom: -7px;
-  width: 15px;
-  height: 15px;
-  background: #7a4a22;
-  border: 2px solid var(--color-fg);
-  border-radius: 50%;
-  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--color-fg);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
-.selector-drumroll__stick--left {
-  animation: selector-drumroll-beat-left 170ms linear infinite;
+/* Four notes, four different flight paths. The translate numbers in the keyframes
+ * produce an upward arc; the per-note `--tx` variable offsets the start X so they
+ * don't all launch from dead centre. */
+.selector-drumroll__note--a {
+  font-size: 1.8rem;
+  color: var(--color-primary);
+  animation: selector-note-float-a 1.1s ease-out infinite;
 }
-
-.selector-drumroll__stick--right {
-  /* Stagger by ~half a cycle so the sticks alternate rather than beat in unison. */
-  animation: selector-drumroll-beat-right 170ms linear infinite;
-  animation-delay: 85ms;
+.selector-drumroll__note--b {
+  font-size: 2.2rem;
+  color: var(--color-secondary);
+  animation: selector-note-float-b 1.3s ease-out infinite;
+  animation-delay: 0.2s;
+}
+.selector-drumroll__note--c {
+  font-size: 1.6rem;
+  color: var(--color-tertiary, #ffd93d);
+  animation: selector-note-float-c 1.2s ease-out infinite;
+  animation-delay: 0.45s;
+}
+.selector-drumroll__note--d {
+  font-size: 2rem;
+  color: var(--color-primary);
+  animation: selector-note-float-d 1.4s ease-out infinite;
+  animation-delay: 0.7s;
 }
 
 @keyframes selector-drumroll-shake {
   0%,
   100% {
-    transform: translate(-2px, 0) rotate(-3deg);
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+/* Each note shares the same rhythm: start hidden at the drum, pop to visible as it
+ * lifts off, drift up-and-outward while rotating, fade as it reaches the apex. The
+ * four keyframes differ only in their x-offsets so notes scatter in different directions. */
+@keyframes selector-note-float-a {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4) rotate(-20deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-140%, -180%) scale(1) rotate(-30deg);
+    opacity: 0;
+  }
+}
+@keyframes selector-note-float-b {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5) rotate(15deg);
+    opacity: 0;
   }
   25% {
-    transform: translate(2px, -1px) rotate(3deg);
+    opacity: 1;
   }
-  50% {
-    transform: translate(-1px, 1px) rotate(-2deg);
-  }
-  75% {
-    transform: translate(1px, 0) rotate(2deg);
+  100% {
+    transform: translate(-80%, -230%) scale(1.1) rotate(25deg);
+    opacity: 0;
   }
 }
-
-@keyframes selector-drumroll-beat-left {
-  0%,
-  100% {
-    /* Resting: tip cocked up-and-away from the drum. */
-    transform: rotate(-42deg);
+@keyframes selector-note-float-c {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4) rotate(-10deg);
+    opacity: 0;
   }
-  50% {
-    /* Strike: tip snapped toward the drum. */
-    transform: rotate(-4deg);
+  22% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(30%, -200%) scale(1) rotate(20deg);
+    opacity: 0;
   }
 }
-
-@keyframes selector-drumroll-beat-right {
-  0%,
-  100% {
-    transform: rotate(42deg);
+@keyframes selector-note-float-d {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5) rotate(25deg);
+    opacity: 0;
   }
-  50% {
-    transform: rotate(4deg);
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(70%, -170%) scale(1.05) rotate(-15deg);
+    opacity: 0;
   }
 }
 
@@ -465,10 +502,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .selector-drumroll__drum,
-  .selector-drumroll__stick--left,
-  .selector-drumroll__stick--right,
+  .selector-drumroll__note,
   .selector-drumroll__party {
     animation: none;
+  }
+  /* Without motion the notes would sit stacked on top of the drum looking odd — hide
+   * them entirely and just keep the static drum + party popper. */
+  .selector-drumroll__note {
+    display: none;
   }
 }
 
@@ -901,16 +942,6 @@
 .interlude-tier--solid {
   background: var(--color-secondary);
   color: var(--color-secondary-fg);
-}
-
-.interlude-tier--okay {
-  background: var(--color-card);
-  color: var(--color-fg);
-}
-
-.interlude-tier--tough {
-  background: var(--color-coral);
-  color: #fff;
 }
 
 @keyframes interlude-tier-shimmer {

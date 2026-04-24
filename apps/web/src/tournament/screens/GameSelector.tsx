@@ -39,12 +39,6 @@ function gameEmoji(id: string): string {
 }
 
 /**
- * Short anticipation pause after the screen renders and before the reel kicks off —
- * gives the player a beat to read "NEXT UP…" and makes the spin feel like an event
- * instead of a jarring cold-start.
- */
-const PRE_SPIN_DELAY_MS = 750;
-/**
  * How long the reel dwells on the winning game after the spin stops, before we fire
  * `onDone` and move on to the briefing. Long enough for the player to read the "LOCKED
  * IN!" banner and recognise the game that was picked.
@@ -55,7 +49,7 @@ const REEL_CELL_H = 80;
 /** How many cells make up the reel. More = longer visible spin = more drama. */
 const REEL_LENGTH = 22;
 
-type SpinPhase = "idle" | "spinning" | "landed";
+type SpinPhase = "spinning" | "landed";
 
 export function GameSelector({ target, pool, label, durationMs, onDone }: Props) {
   // The reel is a deterministic sequence of games. We cycle through the pool (which
@@ -72,32 +66,35 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
     return items;
   }, [pool, target]);
 
-  const [phase, setPhase] = useState<SpinPhase>("idle");
+  // The reel kicks into "spinning" immediately on mount — previously we had an idle
+  // pre-spin pause, but the idle→spinning transition read as a jolt (banner + drum
+  // popping in out of nowhere). Starting in motion is smoother.
+  const [phase, setPhase] = useState<SpinPhase>("spinning");
+  // `hasStarted` controls the reel's translateY. Starts false so the first paint shows
+  // the reel at its initial position (cell[0] centred), then flips to true on the very
+  // next animation frame to kick the CSS transition into the landing position. Without
+  // this two-step, React would mount the element with the end transform already applied
+  // and the reel would snap into place without animating.
+  const [hasStarted, setHasStarted] = useState(false);
 
-  // Total layout: [PRE_SPIN_DELAY_MS idle] → [spinMs spinning] → [LANDED_DWELL_MS landed].
+  // Total layout: [spinMs spinning] → [LANDED_DWELL_MS landed].
   // Floor the spin at 800ms so tiny `durationMs` values don't cause a teleport — the
   // bezier S-curve below needs room to breathe.
-  const spinMs = Math.max(800, durationMs - PRE_SPIN_DELAY_MS - LANDED_DWELL_MS);
+  const spinMs = Math.max(800, durationMs - LANDED_DWELL_MS);
 
   useEffect(() => {
     const timers: number[] = [];
-    // 1. Pre-spin lag — the reel sits still on cell[0], giving the player a beat to
-    //    register "NEXT UP…" before the wheel starts turning. Using a timeout instead
-    //    of RAF because we explicitly want ~750ms, not ~2 frames.
-    timers.push(
-      window.setTimeout(() => setPhase("spinning"), PRE_SPIN_DELAY_MS),
-    );
+    // 1. Next frame: kick off the reel translation. rAF ensures the browser paints the
+    //    initial cell[0] position first so the CSS transition has somewhere to animate
+    //    from.
+    const rafId = requestAnimationFrame(() => setHasStarted(true));
     // 2. Spin completes → land. Small +60ms buffer so the CSS transition finishes
     //    before we swap on the "is-landed" styling.
-    timers.push(
-      window.setTimeout(
-        () => setPhase("landed"),
-        PRE_SPIN_DELAY_MS + spinMs + 60,
-      ),
-    );
+    timers.push(window.setTimeout(() => setPhase("landed"), spinMs + 60));
     // 3. Dwell completes → caller advances the FSM.
     timers.push(window.setTimeout(onDone, durationMs));
     return () => {
+      cancelAnimationFrame(rafId);
       timers.forEach((id) => window.clearTimeout(id));
     };
   }, [spinMs, durationMs, onDone]);
@@ -106,31 +103,30 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
   // End position: item[N-1] (= target) centered in the viewport.
   const initialY = REEL_CELL_H;
   const endY = REEL_CELL_H * (2 - reelItems.length);
-  const translateY = phase === "idle" ? initialY : endY;
+  const translateY = hasStarted ? endY : initialY;
 
   return (
     <div className="tournament-screen" aria-live="polite">
       <div className="tournament-stack" style={{ gap: "var(--space-4)" }}>
         <span className="tournament-pill primary">{label}</span>
-        {/* Banner is hidden during the idle pre-spin lag — there's nothing to say yet,
-            and the round-label pill above already provides context. The banner snaps in
-            when the wheel starts turning and again when it lands. */}
-        {phase !== "idle" ? (
-          <div className="tournament-banner">
-            <h1 className="tournament-title">
-              {phase === "spinning"
-                ? "DRUMROLL, PLEASE…"
-                : `${gameEmoji(target.id)} ${target.name.toUpperCase()}!`}
-            </h1>
-          </div>
-        ) : null}
+        {/* Banner + flair are visible for the entire selector screen — there's no idle
+            pre-spin pause any more, because the idle→spinning pop-in read as a jolt.
+            The text swaps from "DRUMROLL, PLEASE…" to the target game's name when the
+            wheel lands. */}
+        <div className="tournament-banner">
+          <h1 className="tournament-title">
+            {phase === "spinning"
+              ? "DRUMROLL, PLEASE…"
+              : `${gameEmoji(target.id)} ${target.name.toUpperCase()}!`}
+          </h1>
+        </div>
 
         {/* Animated flair between the banner and the reel.
-            - spinning: drum kit (🥁 + beating sticks) for the drumroll
+            - spinning: shaking drum + floating music notes for the drumroll
             - landed:   the drum "morphs" into a 🎉 party popper that springs in
             Keeping both phases in the same vertical slot makes it feel like one continuous
             beat → payoff motion rather than two separate screens. */}
-        {phase !== "idle" ? <SelectorFlair phase={phase} /> : null}
+        <SelectorFlair phase={phase} />
 
         <div
           className={`selector-reel-viewport ${gameAccent(target.id)} ${phase === "landed" ? "is-landed" : ""}`}
@@ -178,9 +174,8 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
 /**
  * Pairs with the selector's spin → land progression:
  *
- *   - "spinning" → cartoon drum kit: the 🥁 shakes vigorously while two CSS drumsticks
- *     beat in a staggered rhythm (right stick lags the left by ~half a cycle so they
- *     alternate). Pure CSS, no canvas or images.
+ *   - "spinning" → the 🥁 shakes vigorously while four music notes (♪ ♫ ♬ ♩) float
+ *     up and fade around it on staggered cycles, reading as "the drum is being played".
  *   - "landed"   → the drum morphs into a 🎉 party popper with a spring-in pop + gentle
  *     idle bounce, signalling "we've picked a game, get excited".
  *
@@ -202,9 +197,11 @@ function SelectorFlair({ phase }: { phase: "spinning" | "landed" }) {
   }
   return (
     <div className="selector-drumroll" aria-hidden>
-      <span className="selector-drumroll__stick selector-drumroll__stick--left" />
+      <span className="selector-drumroll__note selector-drumroll__note--a">♪</span>
+      <span className="selector-drumroll__note selector-drumroll__note--b">♫</span>
       <span className="selector-drumroll__drum">🥁</span>
-      <span className="selector-drumroll__stick selector-drumroll__stick--right" />
+      <span className="selector-drumroll__note selector-drumroll__note--c">♬</span>
+      <span className="selector-drumroll__note selector-drumroll__note--d">♩</span>
     </div>
   );
 }

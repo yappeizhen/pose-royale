@@ -63,7 +63,7 @@ export function Interlude({
         {/* Tier chip — a playful "how'd you do?" verdict based on the local player's
             points. Reflects the 0..1000 normalised scale, so the bands are stable
             across games. */}
-        {localPlayer ? (
+        {localPlayer && localTier ? (
           <span
             className={`interlude-tier interlude-tier--${localTier.variant}`}
             aria-label={`Performance: ${localTier.label}`}
@@ -152,15 +152,20 @@ function headlineFor({
 interface Tier {
   label: string;
   emoji: string;
-  variant: "legendary" | "great" | "solid" | "okay" | "tough";
+  variant: "legendary" | "great" | "solid";
 }
 
-function tierForPoints(points: number): Tier {
+/**
+ * Returns a congratulatory tier chip only for rounds worth celebrating (500+ pts).
+ * Lower scores get no chip at all — a neutral-to-negative label ("OK!", "TOUGH ROUND")
+ * reads as a backhanded compliment and clutters the screen without adding meaning.
+ * The chip is a reward, not a judgment.
+ */
+function tierForPoints(points: number): Tier | null {
   if (points >= 900) return { label: "LEGENDARY!", emoji: "🔥", variant: "legendary" };
   if (points >= 700) return { label: "GREAT!", emoji: "⭐", variant: "great" };
   if (points >= 500) return { label: "SOLID", emoji: "👍", variant: "solid" };
-  if (points >= 300) return { label: "OK!", emoji: "🙂", variant: "okay" };
-  return { label: "TOUGH ROUND", emoji: "💪", variant: "tough" };
+  return null;
 }
 
 function gameEmoji(id: string): string {

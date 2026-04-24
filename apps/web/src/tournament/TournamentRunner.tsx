@@ -96,16 +96,23 @@ export function TournamentRunner({
     return base;
   })();
 
-  const inGame = machine.phase.kind === "playing" || machine.phase.kind === "countdown";
+  // The user is "in the arena" for every tournament phase except the final scoreboard.
+  // Even in the selector / briefing / interlude phases (between rounds) they have scores
+  // and progress at stake, so we should confirm before tossing it all out. On the final
+  // screen the match is already settled, so exit goes straight through.
+  const inArena = machine.phase.kind !== "final";
 
   return (
     <BackScope
       action={
-        inGame
+        inArena
           ? {
               kind: "forfeit",
               solo: players.length === 1,
               onForfeit: () => {
+                // Safe to call even when no runtime is mounted (selector / briefing /
+                // interlude phases don't mount a game module). `destroy()` on an
+                // already-torn-down runtime is a no-op via the optional chain.
                 machine.runtimeRef.current?.destroy();
                 onExit();
               },
@@ -113,9 +120,11 @@ export function TournamentRunner({
           : { kind: "custom", label: "Exit", run: onExit }
       }
     >
-      {/* Every tournament phase has the same top-left back/exit control. The BackScope
-          above flips it between Exit (non-gameplay) and Forfeit (gameplay). */}
-      <BackButton label={inGame ? "Forfeit" : "Exit"} />
+      {/* Every tournament phase has the same top-left back/exit control. The button
+          always says "Exit"; the BackScope above decides whether tapping it opens the
+          "your scores will be lost" confirm (any in-match phase) or quits immediately
+          (final scoreboard, where there's nothing left to lose). */}
+      <BackButton label="Exit" />
 
       {machine.registry.length === 0 ? (
         <EmptyRegistryNotice onExit={onExit} />
