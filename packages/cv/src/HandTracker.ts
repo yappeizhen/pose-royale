@@ -121,6 +121,16 @@ export class HandTracker implements HandTrackerHandle {
     return this._ready;
   }
 
+  /**
+   * Expose the internal `<video>` element — read-only — so games that need
+   * raw frame access (e.g. LearnSign's image classifier) can draw from it.
+   * Returns `null` after `destroy()` so stale holders don't keep drawing from
+   * a freed element.
+   */
+  get videoSource(): HTMLVideoElement | null {
+    return this.destroyed ? null : this.video;
+  }
+
   subscribe(cb: (frame: HandFrame) => void): Unsub {
     this.subs.add(cb);
     return () => this.subs.delete(cb);

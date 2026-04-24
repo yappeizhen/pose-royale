@@ -36,6 +36,11 @@ export {
 } from "./client.js";
 export type { FirebaseConfig } from "./client.js";
 
+export {
+  readFirebaseConfigFromEnv,
+  MissingFirebaseEnvError,
+} from "./env.js";
+
 export type {
   GlobalPlayer,
   MatchmakingEntry,

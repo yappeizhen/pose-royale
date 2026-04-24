@@ -6,9 +6,10 @@
  * it locks in, scores +1, and a new target letter appears. Raw score = letters landed
  * in 30 s; par = 12 → normalizes to 1000 tournament points at plan §1 §score.
  *
- * Inspired by ngzhili/LearnSign (https://github.com/ngzhili/LearnSign). Pass 1 ships
- * with a hand-landmark heuristic covering 6 letters; Pass 2 will swap in the real
- * TF.js SSD MobileNet v2 model for the full 24-letter set.
+ * Inspired by ngzhili/LearnSign (https://github.com/ngzhili/LearnSign). Pass 1.5 ships
+ * with a hand-landmark heuristic across all 24 static letters; Pass 2 drops in a
+ * learned landmark classifier via `createSignDetector({ backend: "landmark" })`.
+ * See `TRAINING.md` for how to train + deploy the model.
  */
 
 import type {
@@ -21,8 +22,13 @@ import type {
   TrackedHand,
   Unsub,
 } from "@pose-royale/sdk";
-import { PASS_1_LETTERS } from "./letters.js";
-import { HOLD_DURATION_MS, SignDetector } from "./SignDetector.js";
+import { ALPHABET, LETTER_BY_ID } from "./letters.js";
+import {
+  createSignDetector,
+  HOLD_DURATION_MS,
+  type CreateSignDetectorOptions,
+  type ISignDetector,
+} from "./detectors/index.js";
 import { manifest } from "./manifest.js";
 
 /**
@@ -90,8 +96,8 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
     "align-items:center",
     "gap:12px",
     "padding:20px 28px 22px",
-    "min-width:200px",
-    "max-width:240px",
+    "min-width:220px",
+    "max-width:260px",
     "background:var(--color-card, #fff)",
     "border:4px solid var(--color-border, #2D1F3D)",
     "border-radius:18px",
@@ -118,25 +124,33 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
 
   // Big letter glyph — readable from across the room. Scaled down from the old
   // centred card since we're on the side now.
+  //
+  // `line-height:1` + explicit top/bottom padding: Nunito's Q/J have long
+  // descenders that escape a tight-line-height box and collide with the
+  // eyebrow/hint underneath. Using a full em-box and padding gives the drop
+  // shadow + descender room to breathe without inflating the card on letters
+  // that don't need it (overflow is clipped by the card's flex layout anyway).
   const glyph = document.createElement("div");
   glyph.style.cssText = [
-    "font-size:clamp(90px, 14vw, 160px)",
-    "line-height:0.85",
+    "font-size:clamp(80px, 12vw, 140px)",
+    "line-height:1",
     "font-weight:900",
     "letter-spacing:-0.04em",
+    "padding:0.05em 0.08em 0.18em",
     "color:var(--color-primary, #7A4AFF)",
     "text-shadow:4px 4px 0 var(--color-border, #2D1F3D)",
   ].join(";");
   card.appendChild(glyph);
 
-  // One-liner hint for how to form the sign.
+  // Short hint for how to form the sign. Widened to 22ch (from 18ch) so the
+  // self-contained descriptions in letters.ts wrap to 2 tidy lines instead of 3.
   const hint = document.createElement("div");
   hint.style.cssText = [
     "font-size:0.95rem",
     "font-weight:700",
     "text-align:center",
-    "max-width:18ch",
-    "line-height:1.25",
+    "max-width:22ch",
+    "line-height:1.3",
     "color:var(--color-fg-muted, #5A4B6E)",
   ].join(";");
   card.appendChild(hint);
@@ -250,7 +264,200 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   hud.appendChild(oppBadge);
 
   // ── Detector + game state ───────────────────────────────────────────────────
-  const detector = new SignDetector();
+  // Backend is resolved at mount() time, not baked in:
+  //   - `VITE_LEARNSIGN_BACKEND=image`    → use the shipped LearnSign SSD model
+  //     (no training needed, ~12 MB download the first time)
+  //   - `VITE_LEARNSIGN_BACKEND=landmark` → use a trained landmark MLP
+  //     (needs TRAINING.md, ~20 KB download)
+  //   - otherwise                          → hand-crafted heuristic (offline, no deps)
+  // The returned object satisfies `ISignDetector`; the rest of `mount()` is
+  // deliberately backend-agnostic so we can A/B all three at runtime.
+  const videoSource = ctx.hands.videoSource;
+  const detectorOpts: CreateSignDetectorOptions = {
+    landmark: {
+      modelUrl:
+        readViteEnv("VITE_LEARNSIGN_MODEL_URL") ??
+        "/models/learnsign/sign-classifier/model.json",
+    },
+  };
+  if (videoSource) {
+    detectorOpts.image = {
+      video: videoSource,
+      modelUrl:
+        readViteEnv("VITE_LEARNSIGN_IMAGE_MODEL_URL") ??
+        "/models/learnsign/model.json",
+    };
+  }
+  const detector: ISignDetector = createSignDetector(detectorOpts);
+  const activeBackend = resolveActiveBackend(detector, detectorOpts);
+
+  // ── Warmup / preload gate ───────────────────────────────────────────────────
+  // Trigger any async model loading NOW, not lazily on first `update()`. The
+  // overlay below blocks the playfield until the detector is ready so the
+  // round timer doesn't tick on an unloaded model. Heuristic detectors don't
+  // implement preload(), so this resolves immediately for them.
+  let detectorReady = detector.preload === undefined;
+  let detectorLoadError: Error | null = null;
+  const preloadPromise = detector.preload?.();
+
+  // ── Backend status chip (bottom-left, dev-only) ─────────────────────────────
+  // Hidden in prod — the "YOU"/opponent tournament badges live in the same
+  // corners and we don't want player-facing UI explaining CV internals. In
+  // dev, this is the fast way to confirm which detector is actually running
+  // when something looks off.
+  const backendBanner = document.createElement("div");
+  backendBanner.style.cssText = [
+    "position:absolute",
+    "bottom:12px",
+    "left:12px",
+    "padding:4px 10px",
+    "font-family:var(--font-mono, ui-monospace, 'SFMono-Regular', monospace)",
+    "font-size:0.65rem",
+    "font-weight:700",
+    "letter-spacing:0.04em",
+    "text-transform:uppercase",
+    "color:var(--color-fg, #2D1F3D)",
+    "background:var(--color-card, #fff)",
+    "border:2px solid var(--color-border, #2D1F3D)",
+    "border-radius:8px",
+    "box-shadow:var(--shadow-sm, 2px 2px 0 #2D1F3D)",
+    "pointer-events:none",
+    "z-index:4",
+    "opacity:0.75",
+    isDevBuild() ? "" : "display:none",
+  ].filter(Boolean).join(";");
+  backendBanner.textContent = formatBackendLabel(activeBackend, "loading");
+  el.appendChild(backendBanner);
+
+  // ── Loading overlay (shown until preload() resolves) ────────────────────────
+  // A full-bleed scrim + a centered "warming up" card. For the heuristic
+  // backend this never appears (detectorReady starts true). For image/landmark
+  // backends this covers the playfield for however long the model download +
+  // TF.js warmup takes — typically <1s for a cached local install, up to ~5s
+  // for a first-time CDN fetch.
+  const loadingOverlay = document.createElement("div");
+  loadingOverlay.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "display:flex",
+    "flex-direction:column",
+    "align-items:center",
+    "justify-content:center",
+    "gap:16px",
+    "background:rgba(45,31,61,0.55)",
+    "backdrop-filter:blur(6px)",
+    "-webkit-backdrop-filter:blur(6px)",
+    "font-family:var(--font-display, 'Nunito', system-ui, sans-serif)",
+    "color:#fff",
+    "z-index:5",
+    "pointer-events:all",
+    "transition:opacity 220ms ease",
+    "opacity:1",
+  ].join(";");
+
+  const loadingCard = document.createElement("div");
+  loadingCard.style.cssText = [
+    "padding:20px 28px",
+    "background:var(--color-card, #fff)",
+    "color:var(--color-fg, #2D1F3D)",
+    "border:4px solid var(--color-border, #2D1F3D)",
+    "border-radius:16px",
+    "box-shadow:var(--shadow-md, 6px 6px 0 #2D1F3D)",
+    "text-align:center",
+    "max-width:320px",
+    "transform:rotate(-1.5deg)",
+  ].join(";");
+  const loadingTitle = document.createElement("div");
+  loadingTitle.style.cssText =
+    "font-size:1.05rem;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px";
+  loadingTitle.textContent = "Warming up the detector…";
+  const loadingDetail = document.createElement("div");
+  loadingDetail.style.cssText =
+    "font-size:0.85rem;font-weight:600;color:var(--color-fg-muted, #5A4B6E);line-height:1.4";
+  loadingDetail.textContent =
+    activeBackend === "image"
+      ? "Fetching the LearnSign model (first run only)"
+      : activeBackend === "landmark"
+        ? "Loading the landmark classifier"
+        : "Preparing the detector";
+  loadingCard.appendChild(loadingTitle);
+  loadingCard.appendChild(loadingDetail);
+  loadingOverlay.appendChild(loadingCard);
+  if (!detectorReady) el.appendChild(loadingOverlay);
+
+  if (preloadPromise) {
+    preloadPromise
+      .then(() => {
+        detectorReady = true;
+        // Fade out, then remove — a hard pop looks janky when the model
+        // arrives mid-countdown.
+        loadingOverlay.style.opacity = "0";
+        window.setTimeout(() => {
+          loadingOverlay.parentNode?.removeChild(loadingOverlay);
+        }, 240);
+      })
+      .catch((err: unknown) => {
+        detectorLoadError = err instanceof Error ? err : new Error(String(err));
+        // Convert the overlay into an error state so the player isn't stuck
+        // staring at a "warming up…" message forever. The game will still
+        // play with whatever the detector gate allows (likely nothing for a
+        // failed image backend) — but at least the UI tells them why.
+        loadingTitle.textContent = "Detector unavailable";
+        loadingCard.style.background = "var(--color-danger, #ff3355)";
+        loadingCard.style.color = "#fff";
+        loadingCard.style.borderColor = "#2D1F3D";
+        loadingDetail.style.color = "rgba(255,255,255,0.9)";
+        loadingDetail.textContent =
+          detectorLoadError.message.length < 160
+            ? detectorLoadError.message
+            : "Check the browser console for details.";
+        // Dismiss on click so the player can still see the stage.
+        loadingOverlay.style.cursor = "pointer";
+        loadingOverlay.addEventListener(
+          "click",
+          () => {
+            loadingOverlay.style.opacity = "0";
+            window.setTimeout(() => {
+              loadingOverlay.parentNode?.removeChild(loadingOverlay);
+            }, 240);
+          },
+          { once: true },
+        );
+      });
+  }
+
+  // Poll the ImageSignDetector's status so the banner reflects load success /
+  // failure. The detector's load is async + fire-and-forget; we just watch for
+  // the state transition. Lightweight — clears itself once terminal.
+  let backendPollId: number | null = null;
+  const maybeDetectorWithStatus = detector as unknown as {
+    getStatus?: () => { state: "loading" | "ready" | "failed"; error?: Error };
+  };
+  if (typeof maybeDetectorWithStatus.getStatus === "function") {
+    const pollStatus = () => {
+      const status = maybeDetectorWithStatus.getStatus!();
+      backendBanner.textContent = formatBackendLabel(activeBackend, status.state);
+      if (status.state === "failed") {
+        backendBanner.style.background = "var(--color-danger, #ff3355)";
+        backendBanner.style.color = "#fff";
+        backendBanner.title = status.error?.message ?? "detector failed to load";
+        console.error("[learnsign] active detector failed to load", status.error);
+      } else if (status.state === "ready") {
+        backendBanner.style.background = "var(--color-success, #4ade80)";
+      }
+      if (status.state === "loading") {
+        backendPollId = window.setTimeout(pollStatus, 250);
+      } else {
+        backendPollId = null;
+      }
+    };
+    pollStatus();
+  } else {
+    // Heuristic / landmark backends don't expose status — assume ready.
+    backendBanner.textContent = formatBackendLabel(activeBackend, "ready");
+    backendBanner.style.background = "var(--color-success, #4ade80)";
+  }
+
   // Deterministic letter queue — seeded from `ctx.rng` so both peers see the same
   // sequence. We pre-build a long rotation (shuffled, no consecutive repeats) and
   // walk through it; each round's RNG is already seeded from the room so peers
@@ -379,7 +586,7 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
   window.addEventListener("keydown", onKeyDown);
 
   function renderTarget(): void {
-    const spec = PASS_1_LETTERS.find((l) => l.id === targetLetter);
+    const spec = LETTER_BY_ID[targetLetter];
     glyph.textContent = targetLetter;
     hint.textContent = spec?.hint ?? "";
   }
@@ -455,15 +662,47 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
     destroy() {
       running = false;
       cancelAnimationFrame(rafId);
+      if (backendPollId !== null) window.clearTimeout(backendPollId);
       handSub();
       roundEndUnsub();
       for (const u of netSubs) u();
       ro.disconnect();
       window.removeEventListener("keydown", onKeyDown);
       detector.reset();
+      detector.dispose?.();
+      // The overlay's outstanding fade-out timer can't reference a torn-down
+      // DOM tree; we wipe everything in one shot here.
       while (el.firstChild) el.removeChild(el.firstChild);
     },
   };
+}
+
+/**
+ * Read a Vite-injected env var without crashing under Vitest/Node where
+ * `import.meta.env` may be undefined. Mirrors the helper in `detectors/index.ts`
+ * so we don't leak a "`import.meta.env` missing" exception across package
+ * boundaries.
+ */
+function readViteEnv(key: string): string | undefined {
+  try {
+    const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+    return env?.[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `true` in `vite dev` / `vite preview`, `false` in production builds. Wrapped
+ * in a try/catch for the same Node-test reason as `readViteEnv`.
+ */
+function isDevBuild(): boolean {
+  try {
+    const env = (import.meta as { env?: { DEV?: boolean } }).env;
+    return env?.DEV === true;
+  } catch {
+    return false;
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -625,21 +864,55 @@ function roundedRectPath(
 }
 
 /**
- * Build a shuffled rotation of the Pass-1 letter set, avoiding consecutive repeats.
- * Long enough (~6x the set) to exhaust even fast players within one round without
- * running off the end.
+ * Figure out which backend we actually got back from the factory so the UI
+ * banner can tell the truth (the factory falls back to heuristic under a few
+ * conditions — no video source, no model URL, etc.).
+ */
+function resolveActiveBackend(
+  detector: ISignDetector,
+  opts: CreateSignDetectorOptions,
+): "heuristic" | "landmark" | "image" {
+  // ImageSignDetector is the only one exposing `getStatus`. We use a structural
+  // check rather than instanceof so bundler tree-shaking + monorepo duplication
+  // can't trip us up.
+  if (typeof (detector as { getStatus?: unknown }).getStatus === "function") {
+    return "image";
+  }
+  const requested = opts.backend ?? readViteEnv("VITE_LEARNSIGN_BACKEND");
+  if (requested === "landmark") return "landmark";
+  return "heuristic";
+}
+
+function formatBackendLabel(
+  backend: "heuristic" | "landmark" | "image",
+  state: "loading" | "ready" | "failed",
+): string {
+  const name =
+    backend === "image"
+      ? "Image SSD"
+      : backend === "landmark"
+        ? "Landmark MLP"
+        : "Heuristic";
+  if (state === "failed") return `${name} · FAILED`;
+  if (state === "loading") return `${name} · loading…`;
+  return `${name} · ready`;
+}
+
+/**
+ * Build a shuffled rotation of the static ASL alphabet (24 letters), avoiding
+ * consecutive repeats. With `reps = 2` we get 48 letters per round — well beyond
+ * what any player will chew through in 30s even with the skip button, while
+ * still ensuring a fresh shuffle if the queue somehow loops.
  */
 function buildLetterQueue(rng: () => number) {
-  const reps = 6;
-  const out: (typeof PASS_1_LETTERS)[number][] = [];
+  const reps = 2;
+  const out: (typeof ALPHABET)[number][] = [];
   for (let i = 0; i < reps; i++) {
-    const shuffled = [...PASS_1_LETTERS];
-    // Fisher-Yates with the provided RNG (so peers agree when seeded identically).
+    const shuffled = [...ALPHABET];
     for (let j = shuffled.length - 1; j > 0; j--) {
       const k = Math.floor(rng() * (j + 1));
       [shuffled[j], shuffled[k]] = [shuffled[k]!, shuffled[j]!];
     }
-    // Avoid repeats across chunk boundaries.
     if (out.length > 0 && shuffled[0]!.id === out[out.length - 1]!.id && shuffled.length > 1) {
       [shuffled[0], shuffled[1]] = [shuffled[1]!, shuffled[0]!];
     }

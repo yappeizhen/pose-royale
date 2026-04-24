@@ -29,6 +29,7 @@ const hands: HandTrackerHandle = {
   latest: null,
   confidence: 0,
   ready: false,
+  videoSource: null,
   subscribe: () => () => {},
 };
 

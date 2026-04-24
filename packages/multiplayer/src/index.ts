@@ -36,6 +36,11 @@ export {
   type RoomChannelBinding,
 } from "./roomChannel.js";
 export { connectPeer, type PeerOptions, type PeerHandle } from "./webrtc.js";
+export {
+  loadIceServers,
+  readIceConfigFromEnv,
+  type IceConfig,
+} from "./iceServers.js";
 export { joinMatchmaking, type JoinQueueOptions, type QueueHandle } from "./matchmaking.js";
 export {
   recordFinal,

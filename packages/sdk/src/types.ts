@@ -66,6 +66,17 @@ export interface HandTrackerHandle {
   readonly ready: boolean;
   /** Fires on every new frame. Returns an unsubscribe. */
   subscribe(cb: (frame: HandFrame) => void): Unsub;
+  /**
+   * Read-only handle to the `<video>` element MediaPipe is running against.
+   * Exposed so CV-heavy games (currently LearnSign's image-based classifier)
+   * can draw frames into a canvas / tensor without spinning up a second camera
+   * pipeline. Do not attach listeners or mutate the element — treat it as a
+   * live video source and draw from it only.
+   *
+   * Returns `null` when the tracker was built without ownership of a video
+   * element (legacy construction path); games should check before using.
+   */
+  readonly videoSource: HTMLVideoElement | null;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

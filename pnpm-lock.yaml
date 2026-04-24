@@ -62,6 +62,9 @@ importers:
       '@pose-royale/game-frootninja':
         specifier: workspace:*
         version: link:../../games/frootninja
+      '@pose-royale/game-learnsign':
+        specifier: workspace:*
+        version: link:../../games/learnsign
       '@pose-royale/game-ponghub':
         specifier: workspace:*
         version: link:../../games/ponghub
@@ -142,6 +145,9 @@ importers:
 
   games/learnsign:
     dependencies:
+      '@pose-royale/cv':
+        specifier: workspace:*
+        version: link:../../packages/cv
       '@pose-royale/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
