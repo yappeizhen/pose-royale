@@ -321,6 +321,157 @@
   }
 }
 
+/* ── Selector drumroll (🥁 + animated sticks) ───────────────────────── */
+/* Renders above the reel only while `phase === "spinning"`. Everything is decorative and
+ * aria-hidden; the spinning banner handles a11y. Sticks are CSS rectangles with a bulb tip
+ * and beat in a staggered rhythm; the drum emoji shakes vigorously underneath. */
+.selector-drumroll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.3rem 0.75rem;
+  line-height: 1;
+  transform: rotate(-1.5deg);
+}
+
+.selector-drumroll__drum {
+  display: inline-block;
+  font-size: 3.6rem;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22));
+  animation: selector-drumroll-shake 110ms linear infinite;
+  transform-origin: center;
+}
+
+.selector-drumroll__stick {
+  position: relative;
+  display: inline-block;
+  width: 9px;
+  height: 52px;
+  /* Warm wood gradient. Darker at the tip (bottom) so the bulb attached via ::after reads
+   * as a natural continuation of the shaft. */
+  background: linear-gradient(to bottom, #edc9a3 0%, #a0683a 100%);
+  border: 2px solid var(--color-fg);
+  border-radius: 4px;
+  /* Pivot at the top so the "hand" stays put and only the tip sweeps — matches a real
+   * drummer's wrist flick. */
+  transform-origin: top center;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.selector-drumroll__stick::after {
+  /* Drumstick tip / ball. Slightly darker than the shaft's darkest point to suggest a
+   * solid wooden head rather than a painted rim. */
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 15px;
+  height: 15px;
+  background: #7a4a22;
+  border: 2px solid var(--color-fg);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.selector-drumroll__stick--left {
+  animation: selector-drumroll-beat-left 170ms linear infinite;
+}
+
+.selector-drumroll__stick--right {
+  /* Stagger by ~half a cycle so the sticks alternate rather than beat in unison. */
+  animation: selector-drumroll-beat-right 170ms linear infinite;
+  animation-delay: 85ms;
+}
+
+@keyframes selector-drumroll-shake {
+  0%,
+  100% {
+    transform: translate(-2px, 0) rotate(-3deg);
+  }
+  25% {
+    transform: translate(2px, -1px) rotate(3deg);
+  }
+  50% {
+    transform: translate(-1px, 1px) rotate(-2deg);
+  }
+  75% {
+    transform: translate(1px, 0) rotate(2deg);
+  }
+}
+
+@keyframes selector-drumroll-beat-left {
+  0%,
+  100% {
+    /* Resting: tip cocked up-and-away from the drum. */
+    transform: rotate(-42deg);
+  }
+  50% {
+    /* Strike: tip snapped toward the drum. */
+    transform: rotate(-4deg);
+  }
+}
+
+@keyframes selector-drumroll-beat-right {
+  0%,
+  100% {
+    transform: rotate(42deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+/* Landed payoff — the drum "becomes" a party popper. We run a one-shot spring-in
+ * (pop) immediately on mount, then let a gentle infinite bounce take over so the
+ * emoji keeps feeling alive while the reel's own pop animation plays underneath. */
+.selector-drumroll__party {
+  display: inline-block;
+  font-size: 3.8rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.22));
+  transform-origin: center;
+  /* Two animations: `pop` runs once (forwards keeps the end scale); `bounce` loops
+   * forever, starting after `pop` completes so they don't fight over transforms. */
+  animation:
+    selector-party-pop 420ms cubic-bezier(0.2, 1.6, 0.3, 1) both,
+    selector-party-bounce 1.6s ease-in-out 420ms infinite;
+}
+
+@keyframes selector-party-pop {
+  0% {
+    transform: scale(0) rotate(-25deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes selector-party-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selector-drumroll__drum,
+  .selector-drumroll__stick--left,
+  .selector-drumroll__stick--right,
+  .selector-drumroll__party {
+    animation: none;
+  }
+}
+
 /* ── Briefing (how-to-play) ─────────────────────────────────────────── */
 .briefing-card {
   width: min(560px, 92vw);
@@ -679,6 +830,155 @@
 
 .tournament-scoreboard .row .total.final {
   font-size: 1.75rem;
+}
+
+/* ── Interlude (post-round results) ──────────────────────────────────────
+ * Layout: headline → game card → tier chip → score rows → progress pips → CTA.
+ * Everything else reuses tournament-stack / tournament-banner / tournament-scoreboard
+ * to stay consistent with the rest of the flow.
+ */
+.interlude-stack {
+  gap: var(--space-3);
+  max-width: 640px;
+}
+
+.interlude-headline {
+  font-size: clamp(1.9rem, 3.4vw + 1rem, 3rem);
+  margin: 0;
+}
+
+.interlude-game-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.5rem;
+  transform: rotate(-1.5deg);
+}
+
+.interlude-game-emoji {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.interlude-game-name {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: var(--fs-h2);
+  color: var(--color-fg);
+  letter-spacing: -0.005em;
+}
+
+/* Tier chip — variants below recolor the same base. */
+.interlude-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: var(--radius-pill);
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transform: rotate(1deg);
+  background: var(--color-card);
+  color: var(--color-fg);
+}
+
+.interlude-tier--legendary {
+  background: var(--color-tertiary);
+  color: var(--color-tertiary-fg);
+  animation: interlude-tier-shimmer 1.8s ease-in-out infinite;
+}
+
+.interlude-tier--great {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+}
+
+.interlude-tier--solid {
+  background: var(--color-secondary);
+  color: var(--color-secondary-fg);
+}
+
+.interlude-tier--okay {
+  background: var(--color-card);
+  color: var(--color-fg);
+}
+
+.interlude-tier--tough {
+  background: var(--color-coral);
+  color: #fff;
+}
+
+@keyframes interlude-tier-shimmer {
+  0%,
+  100% {
+    transform: rotate(1deg) scale(1);
+    box-shadow: var(--shadow-sm);
+  }
+  50% {
+    transform: rotate(1deg) scale(1.04);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interlude-tier--legendary {
+    animation: none;
+  }
+}
+
+/* Scoreboard tweaks — the "/ 3000" max context is shown smaller & muted. */
+.interlude-scoreboard {
+  width: 100%;
+}
+
+.interlude-total-max {
+  color: var(--color-fg-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Progress pips rail — filled circles for completed rounds, outlined for pending. */
+.interlude-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.85rem;
+  background: var(--color-card);
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-xs);
+  transform: rotate(-0.5deg);
+}
+
+.interlude-pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid var(--color-border);
+  background: transparent;
+  display: inline-block;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.interlude-pip.is-done {
+  background: var(--color-primary);
+  transform: scale(1.12);
+}
+
+.interlude-pip--sudden {
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent !important;
+  font-size: 1rem;
+  line-height: 1;
+  transform: none;
 }
 
 /* ── Stage (in-game overlay) ────────────────────────────────────────── */

@@ -112,11 +112,25 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
     <div className="tournament-screen" aria-live="polite">
       <div className="tournament-stack" style={{ gap: "var(--space-4)" }}>
         <span className="tournament-pill primary">{label}</span>
-        <div className="tournament-banner">
-          <h1 className="tournament-title">
-            {phase === "landed" ? "LOCKED IN!" : "NEXT UP…"}
-          </h1>
-        </div>
+        {/* Banner is hidden during the idle pre-spin lag — there's nothing to say yet,
+            and the round-label pill above already provides context. The banner snaps in
+            when the wheel starts turning and again when it lands. */}
+        {phase !== "idle" ? (
+          <div className="tournament-banner">
+            <h1 className="tournament-title">
+              {phase === "spinning"
+                ? "DRUMROLL, PLEASE…"
+                : `${gameEmoji(target.id)} ${target.name.toUpperCase()}!`}
+            </h1>
+          </div>
+        ) : null}
+
+        {/* Animated flair between the banner and the reel.
+            - spinning: drum kit (🥁 + beating sticks) for the drumroll
+            - landed:   the drum "morphs" into a 🎉 party popper that springs in
+            Keeping both phases in the same vertical slot makes it feel like one continuous
+            beat → payoff motion rather than two separate screens. */}
+        {phase !== "idle" ? <SelectorFlair phase={phase} /> : null}
 
         <div
           className={`selector-reel-viewport ${gameAccent(target.id)} ${phase === "landed" ? "is-landed" : ""}`}
@@ -151,14 +165,46 @@ export function GameSelector({ target, pool, label, durationMs, onDone }: Props)
           </div>
         </div>
 
-        <p className="tournament-meta">
-          {phase === "idle"
-            ? "Get ready…"
-            : phase === "landed"
-              ? "Read your briefing next…"
-              : "Randomising…"}
-        </p>
+        {/* Caption only renders once the wheel lands — during idle/spinning the banner
+            (or absence thereof) carries the message. */}
+        {phase === "landed" ? (
+          <p className="tournament-meta">Time to play! 🎮</p>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Pairs with the selector's spin → land progression:
+ *
+ *   - "spinning" → cartoon drum kit: the 🥁 shakes vigorously while two CSS drumsticks
+ *     beat in a staggered rhythm (right stick lags the left by ~half a cycle so they
+ *     alternate). Pure CSS, no canvas or images.
+ *   - "landed"   → the drum morphs into a 🎉 party popper with a spring-in pop + gentle
+ *     idle bounce, signalling "we've picked a game, get excited".
+ *
+ * `prefers-reduced-motion: reduce` short-circuits all the animations — the drum just
+ * sits there politely and the party popper snaps in without the bounce.
+ */
+function SelectorFlair({ phase }: { phase: "spinning" | "landed" }) {
+  if (phase === "landed") {
+    return (
+      <div className="selector-drumroll" aria-hidden>
+        <span
+          key="party"
+          className="selector-drumroll__party"
+        >
+          🎉
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="selector-drumroll" aria-hidden>
+      <span className="selector-drumroll__stick selector-drumroll__stick--left" />
+      <span className="selector-drumroll__drum">🥁</span>
+      <span className="selector-drumroll__stick selector-drumroll__stick--right" />
     </div>
   );
 }

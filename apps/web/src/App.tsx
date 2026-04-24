@@ -154,13 +154,13 @@ function Home({ stream, onStart }: { stream: MediaStream; onStart: () => void })
         />
       </div>
       <p className="app-home__subtitle">
-        Three CV-powered minigames · 30 seconds each · your webcam is the controller
+        Three minigames. Thirty seconds each. Let the chaos commence.
       </p>
       <button
         onClick={onStart}
         className="tournament-button primary xl app-home__cta"
       >
-        🎮 Solo Battle!
+        🎮 Enter the arena
       </button>
       <small className="app-home__hint">
         dev · press <kbd>~</kbd> during play for the debug overlay

@@ -225,6 +225,7 @@ function PhaseView({
 
   if (phase.kind === "interlude") {
     const hasNextRound = phase.justFinished + 1 < plan.setlist.length;
+    const isSuddenDeath = phase.justFinished >= plan.setlist.length;
     return (
       <Interlude
         players={players}
@@ -233,12 +234,10 @@ function PhaseView({
           emptyRound(machine.gameIdForRound(phase.justFinished))
         }
         cumulative={totals}
+        roundNumber={phase.justFinished + 1}
+        totalRounds={plan.setlist.length}
+        isSuddenDeath={isSuddenDeath}
         hasNextRound={hasNextRound}
-        heading={
-          hasNextRound
-            ? `After round ${phase.justFinished + 1} of ${plan.setlist.length}`
-            : "Final round complete"
-        }
         onContinue={machine.continueFromInterlude}
       />
     );
