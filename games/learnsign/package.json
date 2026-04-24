@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@pose-royale/cv": "workspace:*",
-    "@pose-royale/sdk": "workspace:*"
+    "@pose-royale/sdk": "workspace:*",
+    "@tensorflow/tfjs": "^4.22.0"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
