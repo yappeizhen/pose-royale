@@ -20,12 +20,12 @@ Controlled by `VITE_LEARNSIGN_BACKEND` in `.env.local`:
 
 | Backend       | Selects                         | Needs TF.js? | Needs training? | Download |
 | ------------- | ------------------------------- | ------------ | --------------- | -------- |
-| `heuristic`   | (default) rule-based detector   | no           | no              | 0 B      |
-| `image`       | `model.json` (SSD MobileNet)    | yes          | no              | ~12 MB   |
+| `image`       | (default) `model.json` (SSD MobileNet) | yes   | no              | ~12 MB   |
 | `landmark`    | `sign-classifier/model.json`    | yes          | yes             | ~20 KB   |
+| `heuristic`   | rule-based detector, no model   | no           | no              | 0 B      |
 
 ```bash
-# Use the zero-training LearnSign SSD (what's here already):
+# Stay on the shipped SSD (already the default):
 VITE_LEARNSIGN_BACKEND=image
 # Or point at a different image model:
 VITE_LEARNSIGN_IMAGE_MODEL_URL=/models/learnsign/experiments/my-ssd/model.json
@@ -33,16 +33,16 @@ VITE_LEARNSIGN_IMAGE_MODEL_URL=/models/learnsign/experiments/my-ssd/model.json
 # Or, once you've trained one, use the lighter landmark MLP:
 VITE_LEARNSIGN_BACKEND=landmark
 VITE_LEARNSIGN_MODEL_URL=/models/learnsign/sign-classifier/model.json
+
+# Or drop TF.js entirely and run the offline heuristic:
+VITE_LEARNSIGN_BACKEND=heuristic
 ```
 
-Both ML backends dynamically import `@tensorflow/tfjs` at first inference. Add
-it once when you're ready to try them:
-
-```bash
-pnpm -w add @tensorflow/tfjs
-```
-
-Until then the heuristic keeps running, so dev and CI stay offline-friendly.
+Both ML backends dynamically import `@tensorflow/tfjs`. The package is declared
+in `games/learnsign/package.json`, so a fresh `pnpm install` wires it in
+automatically. If the local install fails (e.g. offline, registry flaky), the
+detector transparently falls back to the `esm.sh` CDN build at runtime — or you
+can opt out entirely with `VITE_LEARNSIGN_BACKEND=heuristic`.
 
 ## Trade-offs: image vs. landmark
 

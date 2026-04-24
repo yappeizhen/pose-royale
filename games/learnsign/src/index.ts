@@ -265,11 +265,12 @@ function mount(el: HTMLElement, ctx: GameContext): GameInstance {
 
   // ── Detector + game state ───────────────────────────────────────────────────
   // Backend is resolved at mount() time, not baked in:
-  //   - `VITE_LEARNSIGN_BACKEND=image`    → use the shipped LearnSign SSD model
-  //     (no training needed, ~12 MB download the first time)
-  //   - `VITE_LEARNSIGN_BACKEND=landmark` → use a trained landmark MLP
+  //   - default                             → `image` (shipped SSD model,
+  //     ~12 MB download, no training needed)
+  //   - `VITE_LEARNSIGN_BACKEND=landmark`   → use a trained landmark MLP
   //     (needs TRAINING.md, ~20 KB download)
-  //   - otherwise                          → hand-crafted heuristic (offline, no deps)
+  //   - `VITE_LEARNSIGN_BACKEND=heuristic`  → hand-crafted heuristic
+  //     (offline, zero download, most lenient)
   // The returned object satisfies `ISignDetector`; the rest of `mount()` is
   // deliberately backend-agnostic so we can A/B all three at runtime.
   const videoSource = ctx.hands.videoSource;

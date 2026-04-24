@@ -7,7 +7,10 @@
  *
  *   1. Explicit `backend` in options (used by unit tests + debug overlays).
  *   2. `import.meta.env.VITE_LEARNSIGN_BACKEND` at Vite build time.
- *   3. Default: `"heuristic"`.
+ *   3. Default: `"image"` — the shipped SSD model needs no training and works
+ *      out of the box. If its prerequisites aren't met (no video source, or
+ *      TF.js failed to load), `createSignDetector` transparently degrades to
+ *      the heuristic backend.
  *
  * When `"landmark"` is selected but `modelUrl` isn't provided, the factory
  * falls back to the heuristic and logs a warning — landmark mode requires a
@@ -73,11 +76,13 @@ export function createSignDetector(
 
 function resolveBackendFromEnv(): DetectorBackend {
   // import.meta.env is injected by Vite at build time. In pure-Node test runs
-  // (no Vite) it's undefined, which is fine — we default to heuristic.
+  // (no Vite) it's undefined, which is fine — we still default to `image`
+  // and `createSignDetector` will fall back to heuristic when no video source
+  // is provided (e.g. from Vitest).
   const env = readViteEnv("VITE_LEARNSIGN_BACKEND");
+  if (env === "heuristic") return "heuristic";
   if (env === "landmark") return "landmark";
-  if (env === "image") return "image";
-  return "heuristic";
+  return "image";
 }
 
 function readViteEnv(key: string): string | undefined {
